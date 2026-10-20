@@ -33,6 +33,10 @@ Other commands:
 | `node scripts/scenarios.mjs` | Browser rule/feature scenarios (`SCENARIO=<name>` runs one) |
 | `pnpm models` | Cleans the piece models in `assets/models/source/` into `public/models/` |
 
+CI (GitHub Actions, `.github/workflows/ci.yml`) runs the unit tests, type check, lint,
+build, and the browser smoke test on every pull request. The slower browser scenarios
+run on demand: *Actions → CI → Run workflow → scenarios*.
+
 ## Project layout
 
 - `src/core` — game rules, commands, engine, clock, PGN (no rendering code).
