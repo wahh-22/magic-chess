@@ -10,10 +10,11 @@ interface BoardProps {
   onSquareClick?: (square: Square) => void;
   selected?: Square | null;
   targets?: LegalMove[];
+  lastMove?: { from: Square; to: Square };
 }
 
 /** Stone tiles inside a carved frame. The top of the tiles is y = 0. */
-export function Board({ onSquareClick, selected, targets = [] }: BoardProps) {
+export function Board({ onSquareClick, selected, targets = [], lastMove }: BoardProps) {
   const handleClick = (square: Square) => (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
     onSquareClick?.(square);
@@ -32,6 +33,15 @@ export function Board({ onSquareClick, selected, targets = [] }: BoardProps) {
             onClick={handleClick(square)}
           >
             <boxGeometry args={[0.98, TILE_HEIGHT, 0.98]} />
+          </mesh>
+        );
+      })}
+      {lastMove && [...new Set([lastMove.from, lastMove.to])].map((square) => {
+        const [x, z] = squareToWorld(square);
+        return (
+          <mesh key={`last-${square}`} position={[x, 0.006, z]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}}>
+            <planeGeometry args={[0.96, 0.96]} />
+            <meshStandardMaterial color="#d9a35f" emissive="#d9a35f" emissiveIntensity={0.2} transparent opacity={0.22} depthWrite={false} />
           </mesh>
         );
       })}
