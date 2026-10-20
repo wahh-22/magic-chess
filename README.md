@@ -47,9 +47,9 @@ run on demand: *Actions → CI → Run workflow → scenarios*.
 
 ## Credits and licenses
 
-- **Piece models:** generated with [Meshy](https://www.meshy.ai). The queen and bishop
+- **Piece models:** generated with [Meshy](https://www.meshy.ai). The knight and rook
   models were generated on the free plan and are licensed under
-  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — credit: "Queen and bishop
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — credit: "Knight and rook
   models generated with Meshy (meshy.ai)". The other models were generated on a paid
   plan. Details: `assets/models/source/LICENSE.md`.
 - **Sounds:** [Kenney Impact Sounds](https://kenney.nl/assets/impact-sounds), CC0.
