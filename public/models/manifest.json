@@ -11,9 +11,9 @@
     "n": {
       "file": "n.glb",
       "height": 1.1200000047683716,
-      "footprint": 0.5625085234642029,
-      "triangles": 19998,
-      "fragmentColor": "#7e7973"
+      "footprint": 0.5533502101898193,
+      "triangles": 19994,
+      "fragmentColor": "#827e79"
     },
     "b": {
       "file": "b.glb",
@@ -25,9 +25,9 @@
     "r": {
       "file": "r.glb",
       "height": 1.0080000162124634,
-      "footprint": 0.5080822110176086,
+      "footprint": 0.4900555908679962,
       "triangles": 20000,
-      "fragmentColor": "#86847d"
+      "fragmentColor": "#83807a"
     },
     "q": {
       "file": "q.glb",

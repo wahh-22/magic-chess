@@ -52,11 +52,10 @@ assets and the chess engine keep their own licenses, listed below.
 
 ## Credits and licenses
 
-- **Piece models:** generated with [Meshy](https://www.meshy.ai). The knight and rook
-  models were generated on the free plan and are licensed under
-  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — credit: "Knight and rook
-  models generated with Meshy (meshy.ai)". The other models were generated on a paid
-  plan. Details: `assets/models/source/LICENSE.md`.
+- **Piece models:** © 2026 Wilmer Henao, generated with [Meshy](https://www.meshy.ai)
+  (paid plan) and released under
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — credit: "Magic Chess piece
+  models by Wilmer Henao, CC BY 4.0". Details: `public/models/LICENSE.md`.
 - **Sounds:** [Kenney Impact Sounds](https://kenney.nl/assets/impact-sounds), CC0.
   Details: `public/sounds/LICENSE.md`.
 - **Chess engine:** [Stockfish](https://stockfishchess.org) via
