@@ -46,6 +46,9 @@ async function expectState(step, predicate, timeout = 5000) {
 }
 
 await page.goto(url);
+await expectState("setup screen opens", () => globalThis.__gameStore?.getState().phase === "setup");
+await page.screenshot({ path: `${shots}/smoke-setup.png` });
+await page.getByRole("button", { name: "Start game" }).click();
 await expectState("game starts", () => globalThis.__gameStore?.getState().phase === "playing");
 await expectState("scene renders", () => (globalThis.__frames ?? 0) > 20, 15000);
 
@@ -67,5 +70,8 @@ await expectState(
   20000,
 );
 await page.screenshot({ path: `${shots}/smoke-after-ai.png` });
+await page.getByRole("button", { name: "Menu", exact: true }).click();
+await expectState("Menu returns to setup", () => globalThis.__gameStore.getState().phase === "setup");
 console.log("errors:", errors.length ? errors : "none");
 await browser.close();
+if (errors.length) process.exitCode = 1;

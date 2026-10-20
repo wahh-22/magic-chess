@@ -136,6 +136,64 @@ describe("gameStore", () => {
     expect(store.getState().aiThinking).toBe(false);
   });
 
+  it("retries a rejected AI move and enqueues the successful retry", async () => {
+    const { store, engine, requests } = setup();
+    store.getState().startGame({ ...ai, humanColor: "b" });
+    await flush();
+    requests[0]!.reject(new Error("temporary failure"));
+    await flush();
+    store.getState().retryAiMove();
+    expect(store.getState().lastError).toBeNull();
+    expect(store.getState().aiThinking).toBe(true);
+    store.getState().retryAiMove();
+    await flush();
+    expect(engine.bestMove).toHaveBeenCalledTimes(2);
+    requests[1]!.resolve("e2e4");
+    await flush();
+    expect(store.getState().animationQueue[0]?.uci).toBe("e2e4");
+    expect(store.getState().lastError).toBeNull();
+  });
+
+  it("retry is a no-op on a human turn, including an input error", async () => {
+    const { store, engine } = setup();
+    store.getState().startGame(ai);
+    store.getState().submitCommand("e2e5");
+    store.getState().retryAiMove();
+    await flush();
+    expect(store.getState().lastError).toBe("illegal");
+    expect(engine.bestMove).not.toHaveBeenCalled();
+  });
+
+  it.each(["no error", "queued", "thinking", "over", "setup"] as const)("retry is a no-op when %s", async (guard) => {
+    const { store, engine } = setup();
+    store.getState().startGame(ai);
+    store.getState().submitCommand("e4");
+    store.setState({
+      lastError: guard === "no error" ? null : "engine failed",
+      animationQueue: guard === "queued" ? store.getState().animationQueue : [],
+      aiThinking: guard === "thinking",
+      phase: guard === "over" || guard === "setup" ? guard : "playing",
+    });
+    const before = store.getState();
+    store.getState().retryAiMove();
+    await flush();
+    expect(store.getState()).toBe(before);
+    expect(engine.bestMove).not.toHaveBeenCalled();
+  });
+
+  it("retry recovers from failed engine initialization", async () => {
+    const { store, engine, requests } = setup();
+    vi.mocked(engine.newGame).mockRejectedValueOnce(new Error("initialization failed"));
+    store.getState().startGame({ ...ai, humanColor: "b" });
+    await flush();
+    store.getState().retryAiMove();
+    await flush();
+    expect(engine.newGame).toHaveBeenCalledTimes(2);
+    requests[0]!.resolve("e2e4");
+    await flush();
+    expect(store.getState().animationQueue[0]?.uci).toBe("e2e4");
+  });
+
   it("does not leave the AI thinking after initialization already failed", async () => {
     const { store, engine } = setup();
     vi.mocked(engine.newGame).mockRejectedValueOnce(new Error("initialization failed"));

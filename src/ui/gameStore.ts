@@ -34,6 +34,7 @@ export interface GameStore {
   cancelPromotion(): void;
   animationDone(): void;
   backToSetup(): void;
+  retryAiMove(): void;
 }
 
 const initialSettings: GameSettings = { mode: "ai", humanColor: "w", difficultyId: "casual" };
@@ -65,15 +66,33 @@ export function createGameStore(deps: { createEngine: () => Engine }) {
       }));
     };
 
-    const requestAiMove = async () => {
+    const initializeEngine = (id: number) => {
+      try {
+        engine ??= deps.createEngine();
+        engineReady = engine.newGame().then(() => true, (error: unknown) => {
+          reportError(id, error);
+          return false;
+        });
+      } catch (error) {
+        engineReady = Promise.resolve(false);
+        reportError(id, error);
+      }
+    };
+
+    const requestAiMove = async (retryInitialization = false) => {
       const state = get();
       if (state.phase !== "playing" || isHumanTurn(state) || state.aiThinking || state.animationQueue.length) return;
       const id = state.gameId;
       const ready = engineReady;
       set({ aiThinking: true });
       try {
-        const initialized = await ready;
+        let initialized = await ready;
         if (get().gameId !== id) return;
+        if (!initialized && retryInitialization) {
+          initializeEngine(id);
+          initialized = await engineReady;
+          if (get().gameId !== id) return;
+        }
         if (!initialized) {
           set({ aiThinking: false });
           return;
@@ -117,17 +136,7 @@ export function createGameStore(deps: { createEngine: () => Engine }) {
           lastError: null, gameId: id,
         });
         if (settings.mode === "ai") {
-          try {
-            engine ??= deps.createEngine();
-            engineReady = engine.newGame().then(() => true, (error: unknown) => {
-              reportError(id, error);
-              return false;
-            });
-          } catch (error) {
-            engineReady = Promise.resolve(false);
-            reportError(id, error);
-            return;
-          }
+          initializeEngine(id);
           void requestAiMove();
         }
       },
@@ -184,6 +193,14 @@ export function createGameStore(deps: { createEngine: () => Engine }) {
         const outcome = state.game.outcome();
         if (outcome) set({ phase: "over", outcome });
         else void requestAiMove();
+      },
+
+      retryAiMove() {
+        const state = get();
+        if (!state.lastError || state.phase !== "playing" || isHumanTurn(state) ||
+            state.aiThinking || state.animationQueue.length) return;
+        set({ lastError: null });
+        void requestAiMove(true);
       },
 
       backToSetup() {
