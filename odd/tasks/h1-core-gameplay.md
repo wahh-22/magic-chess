@@ -22,8 +22,8 @@ animated moves, and a Stockfish opponent. Architecture and decisions: `docs/arch
 | T4 | S4 | `Engine` interface + Stockfish Web Worker adapter (UCI, `UCI_Elo`); fake engine for tests. | inline | done | 744a454 |
 | T5 | S3 | `PieceModelProvider` + procedural lathe pieces for all six types, two stone materials. | inline | done | 42fb541 |
 | T6 | S2 | Scene: board, lighting with shadows, orbit camera limits, environment. | inline | done | d73ef85 |
-| T7 | S5, S6 | Interaction: select piece, highlight legal squares, click to move, promotion picker. | inline | pending | — |
-| T8 | S6 | Animation queue: pieces glide between squares, castling moves both pieces, captured piece sinks; core waits for "animation done". Timings in JSON config. | inline | pending | — |
+| T7 | S5, S6 | Interaction: select piece, highlight legal squares, click to move, promotion picker. | inline | done | 3851df5 |
+| T8 | S6 | Animation queue: pieces glide between squares, castling moves both pieces, captured piece sinks; core waits for "animation done". Timings in JSON config. | inline | done | 1b20d34, 5fd1658 |
 | T9 | S4, S6 | UI: setup (vs AI / local 2 players, color, difficulty), turn/check indicator, game-over screen, new game. | inline | pending | — |
 | T10 | S1–S6 | H1 verification: unit suite, build, and manual scenario checklist (castling both sides, en passant, promotion, scholar's mate, stalemate, AI full game). | inline | pending | — |
 
