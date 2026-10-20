@@ -8,3 +8,54 @@ body,
   color: #e8e2d6;
   font-family: Georgia, "Times New Roman", serif;
 }
+
+.promotion-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgb(5 5 9 / 70%);
+}
+
+.promotion-picker {
+  padding: 2rem;
+  border: 1px solid #665c48;
+  border-radius: 0.5rem;
+  background: linear-gradient(145deg, #2b2a2d, #16161b);
+  box-shadow: 0 1rem 4rem #000;
+  text-align: center;
+}
+
+.promotion-picker h2 {
+  margin: 0 0 1.5rem;
+  font-weight: normal;
+  color: #e3c77e;
+}
+
+.promotion-choices {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.promotion-picker button {
+  padding: 0.75rem 1rem;
+  border: 1px solid #73664f;
+  border-radius: 0.25rem;
+  background: #343238;
+  color: #e8e2d6;
+  font: inherit;
+  cursor: pointer;
+}
+
+.promotion-picker button:hover,
+.promotion-picker button:focus-visible {
+  background: #49434a;
+  outline: 2px solid #e3c77e;
+  outline-offset: 2px;
+}
+
+.promotion-picker .promotion-cancel {
+  margin-top: 1.25rem;
+  background: transparent;
+}

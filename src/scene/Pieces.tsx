@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { PieceInstance } from "../core/types";
+import type { PieceInstance, Square } from "../core/types";
 import { squareToWorld } from "./coords";
 import { pieceMaterials } from "./materials";
 import { createProceduralPieceProvider } from "./pieces/proceduralPieces";
@@ -8,12 +8,13 @@ import type { PieceModelProvider } from "./pieces/PieceModelProvider";
 interface PiecesProps {
   pieces: PieceInstance[];
   provider?: PieceModelProvider;
+  onPieceClick?: (square: Square) => void;
 }
 
 /** Pieces face the opponent: geometry faces +x, white turns to -z and black to +z. */
 export const FACING = { w: Math.PI / 2, b: -Math.PI / 2 } as const;
 
-export function Pieces({ pieces, provider }: PiecesProps) {
+export function Pieces({ pieces, provider, onPieceClick }: PiecesProps) {
   const models = useMemo(() => provider ?? createProceduralPieceProvider(), [provider]);
   return (
     <group>
@@ -28,6 +29,10 @@ export function Pieces({ pieces, provider }: PiecesProps) {
             rotation={[0, FACING[piece.color], 0]}
             castShadow
             receiveShadow
+            onClick={(event) => {
+              event.stopPropagation();
+              onPieceClick?.(piece.square);
+            }}
           />
         );
       })}
