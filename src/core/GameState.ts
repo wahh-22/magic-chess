@@ -20,6 +20,7 @@ const SQUARE_PATTERN = /^[a-h][1-8]$/;
 export class GameState {
   private readonly chess: Chess;
   private readonly bySquare = new Map<Square, PieceInstance>();
+  private readonly snapshots: { pieces: PieceInstance[]; event: MoveEvent }[] = [];
 
   constructor(fen?: string) {
     this.chess = fen ? new Chess(fen) : new Chess();
@@ -46,6 +47,10 @@ export class GameState {
 
   history(): string[] {
     return this.chess.history();
+  }
+
+  uciHistory(): string[] {
+    return this.snapshots.map(({ event }) => event.uci);
   }
 
   pieces(): PieceInstance[] {
@@ -92,8 +97,20 @@ export class GameState {
     const chosen = candidates.find((m) => !m.isPromotion() || m.promotion === request.promotion);
     if (!chosen) return { ok: false, error: "illegal" };
 
+    const pieces = this.pieces();
     const move = this.chess.move({ from: chosen.from, to: chosen.to, promotion: chosen.promotion });
-    return { ok: true, event: this.trackPieces(move) };
+    const event = this.trackPieces(move);
+    this.snapshots.push({ pieces, event });
+    return { ok: true, event };
+  }
+
+  undo(): MoveEvent | null {
+    const snapshot = this.snapshots.pop();
+    if (!snapshot) return null;
+    this.chess.undo();
+    this.bySquare.clear();
+    for (const piece of snapshot.pieces) this.bySquare.set(piece.square, { ...piece });
+    return snapshot.event;
   }
 
   /** Mirrors a move applied by chess.js onto the tracked physical pieces. */

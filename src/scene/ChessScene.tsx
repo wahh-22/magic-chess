@@ -44,6 +44,7 @@ export function ChessScene({ children }: { children: ReactNode }) {
 
       <ContactShadows position={[0, -0.33, 0]} scale={14} blur={2.5} opacity={0.6} far={2} />
       <OrbitControls
+        makeDefault
         enablePan={false}
         minDistance={7}
         maxDistance={18}

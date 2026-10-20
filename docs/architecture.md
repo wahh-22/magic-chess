@@ -52,6 +52,10 @@ reports "animation done" → the next turn starts (or the engine is asked).
 | D4 | AI opponent: Stockfish lite, single-threaded WASM, in a Web Worker, behind an `Engine` interface speaking UCI. Difficulty via `UCI_Elo`. | Strongest free engine, no server, standard protocol that also exists natively for Unity/Unreal. Single-threaded avoids COOP/COEP headers. **GPLv3:** if published, Stockfish source must be offered; it runs as a separate program over UCI. | License becomes a problem (swap for a permissive JS engine) or low levels feel inhuman (consider Maia). |
 | D5 | No voice in the MVP. All moves already go through the text `CommandParser`. Later: Web Speech API for recognition plus speech synthesis. | Matching recognized text against ~30 legal moves matters more than the recognizer. Voice becomes just another text source. | Privacy or Firefox support matters (switch to local Whisper). |
 | D6 | MVP scope C (base + destruction + polish), desktop browsers only, delivered in milestones H1 → H2 → H3, each playable and verified. | User decision. Milestones keep something playable at all times. | — |
+| D7 | Sounds: CC0 recordings (Kenney / Sonniss) behind a `SoundProvider` interface, played with Web Audio. | Recordings sound like stone; CC0 needs no attribution. The interface allows swapping packs. | A pack lacks a convincing stone sound. |
+| D8 | Undo: vs the engine, undo reverts your move and the engine's reply; in local mode, one move. | Players expect to get their own turn back. | — |
+| D9 | Clock: optional, presets none / 5+0 / 10+5 / 15+10. Running out of time loses, unless the opponent cannot mate (draw, FIDE rule). The engine's clock runs too. | Real chess rules; off by default keeps casual play relaxed. | — |
+| D10 | Save: autosave in the browser (continue later) plus PGN export/import. | Never lose a game; PGN is the standard format to share and analyse games. | — |
 
 ## MVP milestones
 
