@@ -1,0 +1,39 @@
+{
+  "pieces": {
+    "p": {
+      "file": "pawn.glb",
+      "rotationYDegrees": -90
+    },
+    "n": {
+      "file": "knight.glb",
+      "rotationYDegrees": -90
+    },
+    "b": {
+      "file": "bishop.glb",
+      "rotationYDegrees": -90
+    },
+    "r": {
+      "file": "rook.glb",
+      "rotationYDegrees": -90
+    },
+    "q": {
+      "file": "queen.glb",
+      "rotationYDegrees": -90
+    },
+    "k": {
+      "file": "king.glb",
+      "rotationYDegrees": -90
+    }
+  },
+  "heights": {
+    "p": 0.8,
+    "r": 0.9,
+    "n": 1,
+    "b": 1.15,
+    "q": 1.3,
+    "k": 1.45
+  },
+  "maxFootprint": 0.78,
+  "maxTriangles": 20000,
+  "textureSize": 1024
+}

@@ -56,6 +56,8 @@ reports "animation done" → the next turn starts (or the engine is asked).
 | D8 | Undo: vs the engine, undo reverts your move and the engine's reply; in local mode, one move. | Players expect to get their own turn back. | — |
 | D9 | Clock: optional, presets none / 5+0 / 10+5 / 15+10. Running out of time loses, unless the opponent cannot mate (draw, FIDE rule). The engine's clock runs too. | Real chess rules; off by default keeps casual play relaxed. | — |
 | D10 | Save: autosave in the browser (continue later) plus PGN export/import. | Never lose a game; PGN is the standard format to share and analyse games. | — |
+| D11 | Realistic piece models: the user generates them on the web (Meshy or Tripo) from the prompts in `docs/models/generation-guide.md` and drops the GLB files in `assets/models/source/`; one light-stone set, black pieces are a tinted copy. | No shared credentials; one consistent set for both sides. | Generated quality or license (free plans may require CC BY attribution) is not acceptable. |
+| D12 | Model cleanup is an automated Node pipeline (`scripts/process-models.mjs`, gltf-transform + meshoptimizer) instead of Blender: normalize frame and size, simplify, compress textures. Fracture stays runtime Voronoi for every mesh (supersedes the Blender pre-fracture phase of D3). | Reproducible and versioned; Blender is not installed; runtime fracture already handles any mesh. | A model needs hand repair that code cannot do. |
 
 ## MVP milestones
 

@@ -34,8 +34,14 @@ for (const uci of moves.slice(0, -1)) {
   await idle();
 }
 
+// Earlier captures may still have live bursts, so wait for one created by the last move.
+const lastBurstId = await page.evaluate(() => Math.max(0, ...globalThis.__effectsStore.getState().bursts.map((b) => b.id)));
 await page.evaluate((command) => globalThis.__gameStore.getState().submitCommand(command), moves.at(-1));
-await page.waitForFunction(() => globalThis.__effectsStore.getState().bursts.length > 0, undefined, { timeout: 30000 });
+await page.waitForFunction(
+  (previous) => globalThis.__effectsStore.getState().bursts.some((b) => b.id > previous),
+  lastBurstId,
+  { timeout: 30000 },
+);
 const impactAt = Date.now();
 for (const delay of delays) {
   await page.waitForTimeout(Math.max(0, delay - (Date.now() - impactAt)));

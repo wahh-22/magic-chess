@@ -5,7 +5,9 @@ import type { Color } from "../core/types";
  * Grainy stone texture drawn on a canvas: speckles plus soft veins. Used as color
  * variation and roughness so surfaces read as carved stone, not plastic.
  */
-function stoneTexture(seed: number, size = 256): CanvasTexture {
+function stoneTexture(seed: number, size = 256): CanvasTexture | null {
+  // Pure geometry/provider tests run without a DOM; rendering still uses the canvas texture.
+  if (typeof document === "undefined") return null;
   let state = seed;
   const random = () => {
     state = (state * 1664525 + 1013904223) % 4294967296;
@@ -43,6 +45,11 @@ function stone(color: string, roughness: number, seed: number): MeshStandardMate
 export const pieceMaterials: Record<Color, MeshStandardMaterial> = {
   w: stone("#e9e2d2", 0.55, 11),
   b: stone("#34343a", 0.45, 23),
+};
+
+export const fragmentMaterials: Record<Color, MeshStandardMaterial> = {
+  w: new MeshStandardMaterial({ color: "#e9e2d2", roughness: 0.55 }),
+  b: new MeshStandardMaterial({ color: "#34343a", roughness: 0.45 }),
 };
 
 export const boardMaterials = {

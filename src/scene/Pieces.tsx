@@ -7,7 +7,6 @@ import { planMove, type Impact } from "./animation/planMove";
 import { sampleTrack } from "./animation/sampleTrack";
 import { squareToWorld } from "./coords";
 import { FACING } from "./facing";
-import { pieceMaterials } from "./materials";
 import { createProceduralPieceProvider } from "./pieces/proceduralPieces";
 import type { PieceModelProvider } from "./pieces/PieceModelProvider";
 
@@ -72,7 +71,7 @@ export function Pieces({ pieces, activeEvent, onAnimationDone, onImpact, provide
               else meshes.current.delete(piece.id);
             }}
             geometry={models.geometry(piece.type)}
-            material={pieceMaterials[piece.color]}
+            material={models.material(piece.type, piece.color)}
             position={[x, 0, z]}
             rotation={[0, FACING[piece.color], 0]}
             castShadow

@@ -1,25 +1,21 @@
 import { CylinderCollider, Physics, RigidBody, interactionGroups } from "@react-three/rapier";
-import { Vector3 } from "three";
-import type { MoveEvent, PieceInstance, PieceType } from "../../core/types";
-import { createProceduralPieceProvider } from "../pieces/proceduralPieces";
-import { planPieceColliders, type PieceBounds } from "./pieceColliders";
-import { Suspense } from "react";
+import type { MoveEvent, PieceInstance } from "../../core/types";
+import type { PieceModelProvider } from "../pieces/PieceModelProvider";
+import { createVoronoiFractureProvider } from "../fracture/voronoiFracture";
+import { modelBounds, planPieceColliders } from "./pieceColliders";
+import { Suspense, useMemo } from "react";
 import { Debris, DebrisGround } from "./Debris";
 import { DustBurst } from "./DustBurst";
 import { useEffectsStore } from "./effectsStore";
 
-const models = createProceduralPieceProvider();
-const types: PieceType[] = ["p", "n", "b", "r", "q", "k"];
-const bounds = Object.fromEntries(types.map((type) => {
-  const geometry = models.geometry(type);
-  geometry.computeBoundingBox();
-  const size = geometry.boundingBox!.getSize(new Vector3());
-  return [type, { width: size.x, height: size.y, depth: size.z }];
-})) as Record<PieceType, PieceBounds>;
 const pieceGroup = interactionGroups(0, [1]);
 
 /** Only fixed proxies enter Physics; live meshes remain animation-controlled. */
-export function DestructionLayer({ pieces, activeEvent }: { pieces: PieceInstance[]; activeEvent?: MoveEvent }) {
+export function DestructionLayer({ pieces, activeEvent, provider }: {
+  pieces: PieceInstance[]; activeEvent?: MoveEvent; provider: PieceModelProvider;
+}) {
+  const bounds = useMemo(() => modelBounds(provider), [provider]);
+  const fractures = useMemo(() => createVoronoiFractureProvider(provider), [provider]);
   const bursts = useEffectsStore((state) => state.bursts);
   const finishEffect = useEffectsStore((state) => state.finishEffect);
   const colliders = planPieceColliders(pieces, activeEvent, bounds);
@@ -37,7 +33,7 @@ export function DestructionLayer({ pieces, activeEvent }: { pieces: PieceInstanc
             </RigidBody>
           ))}
           {bursts.filter((burst) => !burst.debrisDone).map((burst) => (
-            <Debris key={burst.id} burst={burst} onDone={() => finishEffect(burst.id, "debris")} />
+            <Debris key={burst.id} burst={burst} provider={provider} fractures={fractures} onDone={() => finishEffect(burst.id, "debris")} />
           ))}
         </Physics>
       </Suspense>

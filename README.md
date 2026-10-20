@@ -1,0 +1,56 @@
+# Magic Chess
+
+A realistic 3D chess game in the browser, inspired by "wizard chess": carved stone
+pieces glide across the board on their own, and captured pieces shatter into debris
+and dust. Play against Stockfish or a friend on the same computer.
+
+## Features
+
+- Full chess rules (castling, en passant, promotion, every draw rule).
+- Stockfish opponent with five difficulty levels, running in a Web Worker.
+- Realistic stone piece models, animated moves, and physics-based shattering.
+- Cinematic camera on major captures, stone sounds, last-move highlight.
+- Undo, optional chess clock (5+0, 10+5, 15+10), autosave with "Continue game",
+  and PGN export/import.
+
+## Run it
+
+Requires Node 24 and pnpm.
+
+```sh
+pnpm install
+pnpm dev        # http://localhost:5173
+```
+
+Other commands:
+
+| Command | What it does |
+|---------|--------------|
+| `pnpm test` | Unit tests (Vitest) |
+| `pnpm typecheck` / `pnpm lint` | TypeScript and ESLint |
+| `pnpm build` | Production build in `dist/` |
+| `node scripts/smoke.mjs` | Browser smoke test (needs `pnpm dev` running and Google Chrome) |
+| `node scripts/scenarios.mjs` | Browser rule/feature scenarios (`SCENARIO=<name>` runs one) |
+| `pnpm models` | Cleans the piece models in `assets/models/source/` into `public/models/` |
+
+## Project layout
+
+- `src/core` — game rules, commands, engine, clock, PGN (no rendering code).
+- `src/scene` — the 3D board, pieces, animation, fracture, debris, camera.
+- `src/ui` — game store and screens. `src/audio` — sound playback.
+- `docs/architecture.md` — design principles and decisions D1–D12.
+- `docs/models/generation-guide.md` — how the piece models were generated.
+
+## Credits and licenses
+
+- **Piece models:** generated with [Meshy](https://www.meshy.ai). The queen and bishop
+  models were generated on the free plan and are licensed under
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — credit: "Queen and bishop
+  models generated with Meshy (meshy.ai)". The other models were generated on a paid
+  plan. Details: `assets/models/source/LICENSE.md`.
+- **Sounds:** [Kenney Impact Sounds](https://kenney.nl/assets/impact-sounds), CC0.
+  Details: `public/sounds/LICENSE.md`.
+- **Chess engine:** [Stockfish](https://stockfishchess.org) via
+  [stockfish.js](https://github.com/nmrugg/stockfish.js), GPLv3. The engine runs as a
+  separate program in a Web Worker; its license is copied to `public/stockfish/` at
+  build time.

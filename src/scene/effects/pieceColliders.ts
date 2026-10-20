@@ -1,12 +1,25 @@
+import { Vector3 } from "three";
 import type { MoveEvent, PieceInstance, PieceType } from "../../core/types";
+import type { PieceModelProvider } from "../pieces/PieceModelProvider";
 import { squareToWorld } from "../coords";
 import type { Vec3 } from "./dust";
 
-/** Geometry dimensions; procedural models have their feet at y=0. */
+/** Geometry dimensions; every provider has its feet at y=0. */
 export interface PieceBounds {
   width: number;
   height: number;
   depth: number;
+}
+
+/** Recompute for the active provider, never share procedural dimensions across a swap. */
+export function modelBounds(provider: PieceModelProvider): Record<PieceType, PieceBounds> {
+  const types: PieceType[] = ["p", "n", "b", "r", "q", "k"];
+  return Object.fromEntries(types.map((type) => {
+    const geometry = provider.geometry(type);
+    geometry.computeBoundingBox();
+    const size = geometry.boundingBox!.getSize(new Vector3());
+    return [type, { width: size.x, height: size.y, depth: size.z }];
+  })) as Record<PieceType, PieceBounds>;
 }
 
 export interface PieceColliderPlan {
