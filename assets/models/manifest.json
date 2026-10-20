@@ -1,13 +1,38 @@
 {
   "pieces": {
-    "p": { "file": "pawn.glb", "rotationYDegrees": 0 },
-    "n": { "file": "knight.glb", "rotationYDegrees": 0 },
-    "b": { "file": "bishop.glb", "rotationYDegrees": 0 },
-    "r": { "file": "rook.glb", "rotationYDegrees": 0 },
-    "q": { "file": "queen.glb", "rotationYDegrees": 0 },
-    "k": { "file": "king.glb", "rotationYDegrees": 0 }
+    "p": {
+      "file": "pawn.glb",
+      "rotationYDegrees": 0
+    },
+    "n": {
+      "file": "knight.glb",
+      "rotationYDegrees": 0
+    },
+    "b": {
+      "file": "bishop.glb",
+      "rotationYDegrees": 0
+    },
+    "r": {
+      "file": "rook.glb",
+      "rotationYDegrees": 0
+    },
+    "q": {
+      "file": "queen.glb",
+      "rotationYDegrees": 0
+    },
+    "k": {
+      "file": "king.glb",
+      "rotationYDegrees": 0
+    }
   },
-  "heights": { "p": 0.8, "r": 0.9, "n": 1.0, "b": 1.15, "q": 1.3, "k": 1.45 },
+  "heights": {
+    "p": 0.896,
+    "r": 1.008,
+    "n": 1.12,
+    "b": 1.288,
+    "q": 1.456,
+    "k": 1.624
+  },
   "maxFootprint": 0.78,
   "maxTriangles": 20000,
   "textureSize": 1024
