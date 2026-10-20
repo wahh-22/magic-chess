@@ -90,7 +90,7 @@ describe("Voronoi fracture (S2)", () => {
 
   it("merges degenerate cells without dropping the original extrema", () => {
     const box = new BoxGeometry(1, 1, 1);
-    const other = createVoronoiFractureProvider({ geometry: () => box }, {
+    const other = createVoronoiFractureProvider({ ...models, geometry: () => box }, {
       fragmentCount: 8, interiorSamples: 0,
     });
     const fragments = other.fragments("p");
@@ -125,7 +125,7 @@ describe("Voronoi fracture (S2)", () => {
     }
     expect(() => createVoronoiFractureProvider(models, { seed: NaN })).toThrow(RangeError);
     const plane = new BoxGeometry(1, 0, 1);
-    const other = createVoronoiFractureProvider({ geometry: () => plane });
+    const other = createVoronoiFractureProvider({ ...models, geometry: () => plane });
     expect(() => other.fragments("p")).toThrow("degenerate piece");
     plane.dispose();
   });

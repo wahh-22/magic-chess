@@ -3,14 +3,12 @@ import { ConvexHullCollider, CuboidCollider, interactionGroups, RigidBody, useBe
 import type { RapierRigidBody } from "@react-three/rapier";
 import { useEffect, useMemo, useRef } from "react";
 import { DEFAULT_EFFECTS_CONFIG } from "../../config/effects";
-import { createVoronoiFractureProvider } from "../fracture/voronoiFracture";
-import { pieceMaterials } from "../materials";
-import { createProceduralPieceProvider } from "../pieces/proceduralPieces";
+import type { PieceModelProvider } from "../pieces/PieceModelProvider";
+import type { FractureProvider } from "../fracture/FractureProvider";
 import { debrisOpacity, isDebrisFinished, planDebris } from "./debrisPlan";
 import type { Burst } from "./effectsStore";
 
 const config = DEFAULT_EFFECTS_CONFIG.debris;
-const fractures = createVoronoiFractureProvider(createProceduralPieceProvider());
 const groundGroup = interactionGroups(0, [1]);
 // Fragments collide with fixed stage/piece proxies, never each other or live meshes.
 const debrisGroup = interactionGroups(1, [0]);
@@ -33,21 +31,24 @@ export function DebrisGround() {
 }
 
 /** Only captured fragments enter Rapier; this component never reads/writes the game store. */
-export function Debris({ burst, onDone }: { burst: Burst; onDone: () => void }) {
-  const fragments = useMemo(() => fractures.fragments(burst.victim.type), [burst.victim.type]);
+export function Debris({ burst, onDone, provider, fractures }: {
+  burst: Burst; onDone: () => void; provider: PieceModelProvider; fractures: FractureProvider;
+}) {
+  const fragments = useMemo(() => fractures.fragments(burst.victim.type), [fractures, burst.victim.type]);
   const plans = useMemo(
     () => planDebris(fragments, burst.victim, burst.impact, burst.seed, config),
     [fragments, burst.victim, burst.impact, burst.seed],
   );
   const hulls = useMemo(() => fragments.map(({ geometry }) => new Float32Array(geometry.getAttribute("position").array)), [fragments]);
   const material = useMemo(() => {
-    const clone = pieceMaterials[burst.victim.color].clone();
+    const clone = provider.fragmentMaterial(burst.victim.type, burst.victim.color).clone();
     clone.transparent = true;
     return clone;
-  }, [burst.victim.color]);
+  }, [provider, burst.victim.type, burst.victim.color]);
   useEffect(() => () => material.dispose(), [material]);
   // Frame-driven Three resources are mutable, not React render state.
   const fadingMaterial = useRef(material);
+  useEffect(() => { fadingMaterial.current = material; }, [material]);
 
   const bodies = useRef(new Map<number, RapierRigidBody>());
   const launched = useRef(new WeakSet<RapierRigidBody>());

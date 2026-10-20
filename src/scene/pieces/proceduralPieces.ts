@@ -10,6 +10,7 @@ import {
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { PieceType } from "../../core/types";
 import type { PieceModelProvider } from "./PieceModelProvider";
+import { fragmentMaterials, pieceMaterials } from "../materials";
 
 const LATHE_SEGMENTS = 48;
 
@@ -17,6 +18,8 @@ const LATHE_SEGMENTS = 48;
 export function createProceduralPieceProvider(): PieceModelProvider {
   const cache = new Map<PieceType, BufferGeometry>();
   return {
+    material: (_type, color) => pieceMaterials[color],
+    fragmentMaterial: (_type, color) => fragmentMaterials[color],
     geometry(type) {
       let geometry = cache.get(type);
       if (!geometry) {

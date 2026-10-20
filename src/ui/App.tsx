@@ -11,6 +11,8 @@ import { DestructionLayer } from "../scene/effects/DestructionLayer";
 import { effectsStore } from "../scene/effects/effectsStore";
 import { ChessScene } from "../scene/ChessScene";
 import { Pieces } from "../scene/Pieces";
+import { createProceduralPieceProvider } from "../scene/pieces/proceduralPieces";
+import { loadPieceModels } from "../scene/pieces/gltfPieces";
 import { useGameStore } from "./gameStore";
 import { PromotionPicker } from "./PromotionPicker";
 import { SetupScreen } from "./SetupScreen";
@@ -18,6 +20,12 @@ import { Hud } from "./Hud";
 import { GameOverScreen } from "./GameOverScreen";
 
 export function App() {
+  const [models, setModels] = useState(createProceduralPieceProvider);
+  useEffect(() => {
+    let active = true;
+    void loadPieceModels().then((provider) => { if (active) setModels(provider); });
+    return () => { active = false; };
+  }, []);
   const pieces = useGameStore((state) => state.displayedPieces);
   const selected = useGameStore((state) => state.selected);
   const targets = useGameStore((state) => state.legalTargets);
@@ -61,13 +69,14 @@ export function App() {
           onSquareClick={selectSquare}
         />
         <Pieces
+          provider={models}
           pieces={pieces}
           activeEvent={activeEvent}
           onAnimationDone={animationDone}
           onImpact={effectsStore.getState().addBurst}
           onPieceClick={selectSquare}
         />
-        <DestructionLayer pieces={pieces} activeEvent={activeEvent} />
+        <DestructionLayer pieces={pieces} activeEvent={activeEvent} provider={models} />
       </ChessScene>
       {phase === "setup" ? <SetupScreen /> : <Hud />}
       {phase === "over" && <GameOverScreen />}
