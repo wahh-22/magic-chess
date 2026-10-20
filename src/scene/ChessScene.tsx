@@ -1,6 +1,15 @@
 import { ContactShadows, Environment, Lightformer, OrbitControls } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import type { ReactNode } from "react";
+
+/** Development-only frame count so browser smoke tests can wait for a rendered scene. */
+function DevFrameCounter() {
+  useFrame(() => {
+    const scope = globalThis as { __frames?: number };
+    scope.__frames = (scope.__frames ?? 0) + 1;
+  });
+  return null;
+}
 
 /** Dark hall lit by one warm key light, like a stage. No network assets. */
 export function ChessScene({ children }: { children: ReactNode }) {
@@ -31,6 +40,7 @@ export function ChessScene({ children }: { children: ReactNode }) {
       </Environment>
 
       {children}
+      {import.meta.env.DEV && <DevFrameCounter />}
 
       <ContactShadows position={[0, -0.33, 0]} scale={14} blur={2.5} opacity={0.6} far={2} />
       <OrbitControls

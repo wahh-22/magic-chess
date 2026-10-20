@@ -21,7 +21,7 @@ animated moves, and a Stockfish opponent. Architecture and decisions: `docs/arch
 | T3 | S5 | `CommandParser`: SAN, UCI, and square-pair text → legal move or explicit error. Clicks produce commands too. Tested. | inline | done | 6ce4dc5 |
 | T4 | S4 | `Engine` interface + Stockfish Web Worker adapter (UCI, `UCI_Elo`); fake engine for tests. | inline | done | 744a454 |
 | T5 | S3 | `PieceModelProvider` + procedural lathe pieces for all six types, two stone materials. | inline | done | 42fb541 |
-| T6 | S2 | Scene: board, lighting with shadows, orbit camera limits, environment. | inline | in progress | — |
+| T6 | S2 | Scene: board, lighting with shadows, orbit camera limits, environment. | inline | done | d73ef85 |
 | T7 | S5, S6 | Interaction: select piece, highlight legal squares, click to move, promotion picker. | inline | pending | — |
 | T8 | S6 | Animation queue: pieces glide between squares, castling moves both pieces, captured piece sinks; core waits for "animation done". Timings in JSON config. | inline | pending | — |
 | T9 | S4, S6 | UI: setup (vs AI / local 2 players, color, difficulty), turn/check indicator, game-over screen, new game. | inline | pending | — |

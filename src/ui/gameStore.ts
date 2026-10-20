@@ -201,3 +201,6 @@ export const gameStore = createGameStore({ createEngine: createStockfishEngine }
 export function useGameStore<T>(selector: (state: GameStore) => T): T {
   return useStore(gameStore, selector);
 }
+
+// Development-only handle for browser smoke tests (scripts/smoke.mjs).
+if (import.meta.env.DEV) Object.assign(globalThis, { __gameStore: gameStore });

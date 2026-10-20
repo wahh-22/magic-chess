@@ -11,23 +11,23 @@ export function App() {
   const targets = useGameStore((state) => state.legalTargets);
   const selectSquare = useGameStore((state) => state.selectSquare);
   const startGame = useGameStore((state) => state.startGame);
-  const queueLength = useGameStore((state) => state.animationQueue.length);
+  const activeEvent = useGameStore((state) => state.animationQueue[0]);
   const animationDone = useGameStore((state) => state.animationDone);
 
   useEffect(() => {
     startGame({ mode: "ai", humanColor: "w", difficultyId: "casual" });
   }, [startGame]);
 
-  useEffect(() => {
-    // TEMPORARY (T8): the animation player will acknowledge each event instead.
-    if (queueLength > 0) animationDone();
-  }, [queueLength, animationDone]);
-
   return (
     <div className="app">
       <ChessScene>
         <Board selected={selected} targets={targets} onSquareClick={selectSquare} />
-        <Pieces pieces={pieces} onPieceClick={selectSquare} />
+        <Pieces
+          pieces={pieces}
+          activeEvent={activeEvent}
+          onAnimationDone={animationDone}
+          onPieceClick={selectSquare}
+        />
       </ChessScene>
       <PromotionPicker />
     </div>
