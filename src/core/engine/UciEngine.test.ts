@@ -120,6 +120,27 @@ describe("UciEngine", () => {
   });
 });
 
+describe("UciEngine — timeouts", () => {
+  it("stops a timed-out search and ignores its late answer in the next search", async () => {
+    const transport = new FakeTransport();
+    transport.autoReplyToGo = false;
+    const engine = new UciEngine(transport, { searchGraceMs: 20 });
+
+    await expect(engine.bestMove(START_FEN, byId("casual"))).rejects.toThrow("timed out");
+    expect(transport.sent.at(-1)).toBe("stop");
+
+    // The stopped search answers late, while the next request is being prepared.
+    transport.bestMoves = ["a2a3", "g1f3"];
+    transport.replyBestMove();
+    const next = engine.bestMove("next-fen", byId("casual"));
+    await flush();
+    transport.replyBestMove();
+
+    await expect(next).resolves.toBe("g1f3");
+    expect(transport.sent.slice(-4)).toEqual(["stop", "isready", "position fen next-fen", `go movetime ${byId("casual").moveTimeMs}`]);
+  });
+});
+
 describe("DIFFICULTIES", () => {
   it("offers ordered presets with unique ids", () => {
     expect(DIFFICULTIES.map((d) => d.id)).toEqual(["beginner", "casual", "club", "expert", "master"]);

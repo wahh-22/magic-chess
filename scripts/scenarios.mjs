@@ -1,7 +1,7 @@
 // H1/T10 browser verification. Run against Vite: node scripts/scenarios.mjs [url]
 // Only submit commands: the mounted scene must finish every real animation.
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { Chess } from "chess.js";
 import { chromium } from "playwright";
 
@@ -247,6 +247,8 @@ try {
     }
     if (failure) {
       failures++;
+      // Keep the full failure (stack + store state) even when console output gets truncated.
+      writeFileSync(`${shots}/scenario-${name}.fail.txt`, failure);
       console.log(`FAIL ${name}: ${failure}; screenshot ${path}`);
     } else {
       console.log(`PASS ${name}: ${facts}; displayed id→square/type = game.pieces(); queue empty; no lastError; screenshot ${path}`);
