@@ -1,4 +1,15 @@
 {
+  "debris": {
+    "impulseStrength": 1.8,
+    "upwardBias": 1.6,
+    "outwardStrength": 0.7,
+    "randomSpread": 0.3,
+    "torque": 2,
+    "lifetimeMs": 2200,
+    "fadeDurationMs": 900,
+    "sinkDistance": 0.8,
+    "maxSimultaneousBursts": 4
+  },
   "dust": {
     "count": 70,
     "lifetimeMs": 1700,

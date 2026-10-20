@@ -19,8 +19,22 @@ export interface DustConfig {
   color: string;
 }
 
+export interface DebrisConfig {
+  /** Launch speed at the reference fragment volume, in board units/second. */
+  impulseStrength: number;
+  upwardBias: number;
+  outwardStrength: number;
+  randomSpread: number;
+  torque: number;
+  lifetimeMs: number;
+  fadeDurationMs: number;
+  sinkDistance: number;
+  maxSimultaneousBursts: number;
+}
+
 export interface EffectsConfig {
   dust: DustConfig;
+  debris: DebrisConfig;
 }
 
 export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = effects;
