@@ -24,8 +24,8 @@ animated moves, and a Stockfish opponent. Architecture and decisions: `docs/arch
 | T6 | S2 | Scene: board, lighting with shadows, orbit camera limits, environment. | inline | done | d73ef85 |
 | T7 | S5, S6 | Interaction: select piece, highlight legal squares, click to move, promotion picker. | inline | done | 3851df5 |
 | T8 | S6 | Animation queue: pieces glide between squares, castling moves both pieces, captured piece sinks; core waits for "animation done". Timings in JSON config. | inline | done | 1b20d34, 5fd1658 |
-| T9 | S4, S6 | UI: setup (vs AI / local 2 players, color, difficulty), turn/check indicator, game-over screen, new game. | inline | pending | — |
-| T10 | S1–S6 | H1 verification: unit suite, build, and manual scenario checklist (castling both sides, en passant, promotion, scholar's mate, stalemate, AI full game). | inline | pending | — |
+| T9 | S4, S6 | UI: setup (vs AI / local 2 players, color, difficulty), turn/check indicator, game-over screen, new game. | inline | done | df60f24 |
+| T10 | S1–S6 | H1 verification: unit suite, build, and manual scenario checklist (castling both sides, en passant, promotion, scholar's mate, stalemate, AI full game). | inline | done | 299b678 |
 
 Notes: the project is not a git repository yet; T1 initializes it so each task can
 be committed as a work unit. Delivery (push, remote, publishing) stays a user decision.
@@ -43,3 +43,5 @@ be committed as a work unit. Delivery (push, remote, publishing) stays a user de
 - **L9** (user, D5): "si,  dale con D"
 - **L10** (user, D6): "vamos con C"
 - **L11** (user, desktop-only MVP and write the plan): "si"
+- **L12** (verification): T10 browser scenarios pass (castling both sides, en passant, promotion via picker, scholar's mate + Play again, Loyd stalemate, 6 moves vs Beginner engine); scene matches game state in every scenario. Open: vs-engine timed out once in 6 runs; cause not captured.
+- **L13** (fix): HUD showed "Black to move — check!" after checkmate; now shows the result (48d11db).
