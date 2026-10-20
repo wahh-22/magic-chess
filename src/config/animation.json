@@ -4,8 +4,6 @@
   "maxMoveMs": 1400,
   "knightHopHeight": 0.6,
   "liftHeight": 0.08,
-  "captureSinkMs": 700,
-  "captureSinkDepth": 1.4,
   "captureImpactLeadMs": 120,
   "castlingRookDelayMs": 250,
   "postMovePauseMs": 120

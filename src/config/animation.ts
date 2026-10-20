@@ -6,8 +6,6 @@ export interface AnimationConfig {
   maxMoveMs: number;
   knightHopHeight: number;
   liftHeight: number;
-  captureSinkMs: number;
-  captureSinkDepth: number;
   captureImpactLeadMs: number;
   castlingRookDelayMs: number;
   postMovePauseMs: number;

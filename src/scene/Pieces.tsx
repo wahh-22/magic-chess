@@ -3,7 +3,7 @@ import { useMemo, useRef } from "react";
 import type { Mesh } from "three";
 import { DEFAULT_ANIMATION_CONFIG } from "../config/animation";
 import type { MoveEvent, PieceInstance, Square } from "../core/types";
-import { planMove } from "./animation/planMove";
+import { planMove, type Impact } from "./animation/planMove";
 import { sampleTrack } from "./animation/sampleTrack";
 import { squareToWorld } from "./coords";
 import { pieceMaterials } from "./materials";
@@ -15,6 +15,8 @@ interface PiecesProps {
   /** Move being animated; `pieces` still shows the position before it. */
   activeEvent?: MoveEvent;
   onAnimationDone?: () => void;
+  /** Fires once when the attacker reaches the captured piece. */
+  onImpact?: (impact: Impact, victim: PieceInstance) => void;
   provider?: PieceModelProvider;
   onPieceClick?: (square: Square) => void;
 }
@@ -22,15 +24,17 @@ interface PiecesProps {
 /** Pieces face the opponent: geometry faces +x, white turns to -z and black to +z. */
 export const FACING = { w: Math.PI / 2, b: -Math.PI / 2 } as const;
 
-export function Pieces({ pieces, activeEvent, onAnimationDone, provider, onPieceClick }: PiecesProps) {
+export function Pieces({ pieces, activeEvent, onAnimationDone, onImpact, provider, onPieceClick }: PiecesProps) {
   const models = useMemo(() => provider ?? createProceduralPieceProvider(), [provider]);
   const meshes = useRef(new Map<string, Mesh>());
   const plan = useMemo(() => (activeEvent ? planMove(activeEvent) : undefined), [activeEvent]);
-  const playback = useRef<{ plan: NonNullable<typeof plan>; startedAt?: number; done: boolean } | undefined>(undefined);
+  const playback = useRef<
+    { plan: NonNullable<typeof plan>; startedAt?: number; impacted: boolean; done: boolean } | undefined
+  >(undefined);
 
   useFrame(({ clock }) => {
     if (!plan) return;
-    if (playback.current?.plan !== plan) playback.current = { plan, done: false };
+    if (playback.current?.plan !== plan) playback.current = { plan, impacted: false, done: false };
     const current = playback.current;
     if (current.done) return;
     const now = clock.getElapsedTime() * 1000;
@@ -43,6 +47,12 @@ export function Pieces({ pieces, activeEvent, onAnimationDone, provider, onPiece
       const sample = sampleTrack(track, elapsed, DEFAULT_ANIMATION_CONFIG);
       mesh.position.set(sample.x, sample.y, sample.z);
       mesh.visible = sample.visible;
+    }
+
+    if (plan.impact && !current.impacted && elapsed >= plan.impact.atMs) {
+      current.impacted = true;
+      const victim = pieces.find((piece) => piece.id === plan.impact!.pieceId);
+      if (victim) onImpact?.(plan.impact, victim);
     }
 
     if (elapsed >= plan.durationMs) {

@@ -44,21 +44,31 @@ describe("planMove", () => {
     expect(plan.durationMs).toBeCloseTo(Math.hypot(2, 2) / 4 * 1000 + 90);
   });
 
-  it.each(["e4", "d5"])("sinks the captured piece at its own square %s, including en passant", (square) => {
-    const custom = { ...config, captureImpactLeadMs: 75, captureSinkMs: 1200, postMovePauseMs: 33 };
+  it.each(["e4", "d5"])("shatters the captured piece at its own square %s on impact, including en passant", (square) => {
+    const custom = { ...config, captureImpactLeadMs: 75, postMovePauseMs: 33 };
     const plan = planMove(move({ captured: { pieceId: "victim", square } }), custom);
     const arrival = plan.tracks[0]!.durationMs;
     expect(plan.tracks[1]).toEqual({
-      pieceId: "victim", kind: "sink", startMs: arrival - 75, durationMs: 1200,
+      pieceId: "victim", kind: "shatter", startMs: arrival - 75, durationMs: 0,
       from: squareToWorld(square), to: squareToWorld(square),
     });
-    expect(plan.durationMs).toBeCloseTo(arrival - 75 + 1200 + 33);
+    expect(plan.durationMs).toBeCloseTo(arrival + 33);
   });
 
-  it("keeps the mover authoritative for total duration when a sink finishes earlier", () => {
-    const custom = { ...config, captureImpactLeadMs: 200, captureSinkMs: 50, postMovePauseMs: 25 };
-    const plan = planMove(move({ captured: { pieceId: "victim", square: "e4" } }), custom);
-    expect(plan.durationMs).toBeCloseTo(plan.tracks[0]!.durationMs + 25);
+  it("describes the impact with the victim position and the unit attack direction", () => {
+    const custom = { ...config, captureImpactLeadMs: 75 };
+    const plan = planMove(move({ from: "e5", to: "d6", captured: { pieceId: "victim", square: "d5" } }), custom);
+    expect(plan.impact).toMatchObject({
+      atMs: plan.tracks[0]!.durationMs - 75,
+      pieceId: "victim",
+      position: squareToWorld("d5"),
+    });
+    expect(plan.impact!.direction[0]).toBeCloseTo(-Math.SQRT1_2);
+    expect(plan.impact!.direction[1]).toBeCloseTo(-Math.SQRT1_2);
+  });
+
+  it("has no impact for quiet moves", () => {
+    expect(planMove(move()).impact).toBeUndefined();
   });
 
   it("delays the castling rook glide and waits for the last track", () => {

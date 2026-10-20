@@ -11,10 +11,9 @@ export interface TrackSample {
 export function sampleTrack(track: Track, elapsedMs: number, config: AnimationConfig): TrackSample {
   const elapsed = elapsedMs - track.startMs;
   const t = elapsed < 0 ? 0 : track.durationMs <= 0 ? 1 : Math.min(1, elapsed / track.durationMs);
-  if (track.kind === "sink") {
-    return {
-      x: track.from[0], y: -config.captureSinkDepth * t * t || 0, z: track.from[1], visible: t < 1,
-    };
+  if (track.kind === "shatter") {
+    // The piece is replaced by its fragments at impact (see DebrisLayer).
+    return { x: track.from[0], y: 0, z: track.from[1], visible: elapsed < 0 };
   }
 
   const eased = t * t * (3 - 2 * t);
