@@ -16,16 +16,16 @@ animated moves, and a Stockfish opponent. Architecture and decisions: `docs/arch
 
 | ID | Specs | Task | Route | Status | Commit |
 |----|-------|------|-------|--------|--------|
-| T1 | S2 | Scaffold Vite + React + TypeScript + R3F + drei, Vitest, ESLint, pnpm; `src/core`, `src/scene`, `src/ui` folders. | inline | pending | — |
-| T2 | S2, S6 | `GameState` over chess.js: apply move, legal moves per square, promotion, game-over reason (all S6 endings), move events. Pure TS, tested. | inline | pending | — |
-| T3 | S5 | `CommandParser`: SAN, UCI, and square-pair text → legal move or explicit error. Clicks produce commands too. Tested. | inline | pending | — |
-| T4 | S4 | `Engine` interface + Stockfish Web Worker adapter (UCI, `UCI_Elo`); fake engine for tests. | inline | pending | — |
-| T5 | S3 | `PieceModelProvider` + procedural lathe pieces for all six types, two stone materials. | inline | pending | — |
-| T6 | S2 | Scene: board, lighting with shadows, orbit camera limits, environment. | inline | pending | — |
-| T7 | S5, S6 | Interaction: select piece, highlight legal squares, click to move, promotion picker. | inline | pending | — |
-| T8 | S6 | Animation queue: pieces glide between squares, castling moves both pieces, captured piece sinks; core waits for "animation done". Timings in JSON config. | inline | pending | — |
-| T9 | S4, S6 | UI: setup (vs AI / local 2 players, color, difficulty), turn/check indicator, game-over screen, new game. | inline | pending | — |
-| T10 | S1–S6 | H1 verification: unit suite, build, and manual scenario checklist (castling both sides, en passant, promotion, scholar's mate, stalemate, AI full game). | inline | pending | — |
+| T1 | S2 | Scaffold Vite + React + TypeScript + R3F + drei, Vitest, ESLint, pnpm; `src/core`, `src/scene`, `src/ui` folders. | inline | done | 5215f00 |
+| T2 | S2, S6 | `GameState` over chess.js: apply move, legal moves per square, promotion, game-over reason (all S6 endings), move events. Pure TS, tested. | inline | done | a6ba1cc |
+| T3 | S5 | `CommandParser`: SAN, UCI, and square-pair text → legal move or explicit error. Clicks produce commands too. Tested. | inline | done | 6ce4dc5 |
+| T4 | S4 | `Engine` interface + Stockfish Web Worker adapter (UCI, `UCI_Elo`); fake engine for tests. | inline | done | 744a454 |
+| T5 | S3 | `PieceModelProvider` + procedural lathe pieces for all six types, two stone materials. | inline | done | 42fb541 |
+| T6 | S2 | Scene: board, lighting with shadows, orbit camera limits, environment. | inline | done | d73ef85 |
+| T7 | S5, S6 | Interaction: select piece, highlight legal squares, click to move, promotion picker. | inline | done | 3851df5 |
+| T8 | S6 | Animation queue: pieces glide between squares, castling moves both pieces, captured piece sinks; core waits for "animation done". Timings in JSON config. | inline | done | 1b20d34, 5fd1658 |
+| T9 | S4, S6 | UI: setup (vs AI / local 2 players, color, difficulty), turn/check indicator, game-over screen, new game. | inline | done | df60f24 |
+| T10 | S1–S6 | H1 verification: unit suite, build, and manual scenario checklist (castling both sides, en passant, promotion, scholar's mate, stalemate, AI full game). | inline | done | 299b678 |
 
 Notes: the project is not a git repository yet; T1 initializes it so each task can
 be committed as a work unit. Delivery (push, remote, publishing) stays a user decision.
@@ -43,3 +43,5 @@ be committed as a work unit. Delivery (push, remote, publishing) stays a user de
 - **L9** (user, D5): "si,  dale con D"
 - **L10** (user, D6): "vamos con C"
 - **L11** (user, desktop-only MVP and write the plan): "si"
+- **L12** (verification): T10 browser scenarios pass (castling both sides, en passant, promotion via picker, scholar's mate + Play again, Loyd stalemate, 6 moves vs Beginner engine); scene matches game state in every scenario. Open: vs-engine timed out once in 6 runs; cause not captured.
+- **L13** (fix): HUD showed "Black to move — check!" after checkmate; now shows the result (48d11db).
