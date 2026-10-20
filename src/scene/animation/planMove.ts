@@ -4,16 +4,27 @@ import { squareToWorld } from "../coords";
 
 export interface Track {
   pieceId: string;
-  kind: "glide" | "hop" | "sink";
+  kind: "glide" | "hop" | "shatter";
   startMs: number;
   durationMs: number;
   from: [number, number];
   to: [number, number];
 }
 
+/** The instant the attacker reaches its victim; destruction effects start here. */
+export interface Impact {
+  atMs: number;
+  pieceId: string;
+  /** World [x, z] of the captured piece. */
+  position: [number, number];
+  /** Unit [x, z] direction the attacker was travelling. */
+  direction: [number, number];
+}
+
 export interface MovePlan {
   durationMs: number;
   tracks: Track[];
+  impact?: Impact;
 }
 
 /** Presentation only: the event already describes an authoritative, applied move. */
@@ -34,14 +45,19 @@ export function planMove(event: MoveEvent, config: AnimationConfig = DEFAULT_ANI
     to,
   };
   const tracks: Track[] = [mover];
+  let impact: Impact | undefined;
 
   if (event.captured) {
     const square = squareToWorld(event.captured.square);
-    tracks.push({
-      pieceId: event.captured.pieceId, kind: "sink",
-      startMs: mover.durationMs - config.captureImpactLeadMs,
-      durationMs: config.captureSinkMs, from: square, to: square,
-    });
+    const atMs = Math.max(0, mover.durationMs - config.captureImpactLeadMs);
+    const length = Math.hypot(to[0] - from[0], to[1] - from[1]);
+    tracks.push({ pieceId: event.captured.pieceId, kind: "shatter", startMs: atMs, durationMs: 0, from: square, to: square });
+    impact = {
+      atMs,
+      pieceId: event.captured.pieceId,
+      position: square,
+      direction: [(to[0] - from[0]) / length, (to[1] - from[1]) / length],
+    };
   }
   if (event.rookMove) {
     const rookFrom = squareToWorld(event.rookMove.from);
@@ -56,5 +72,6 @@ export function planMove(event: MoveEvent, config: AnimationConfig = DEFAULT_ANI
   return {
     durationMs: Math.max(...tracks.map((track) => track.startMs + track.durationMs)) + config.postMovePauseMs,
     tracks,
+    ...(impact ? { impact } : {}),
   };
 }

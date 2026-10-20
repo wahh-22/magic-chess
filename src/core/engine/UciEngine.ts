@@ -16,6 +16,10 @@ interface Waiter {
 /** Extra time a search may take beyond its move time before it counts as hung. */
 const SEARCH_GRACE_MS = 10_000;
 
+export interface UciEngineOptions {
+  searchGraceMs?: number;
+}
+
 /** Speaks UCI to an engine over any line-based transport. Requests run one at a time. */
 export class UciEngine implements Engine {
   private queue: Promise<unknown> = Promise.resolve();
@@ -23,8 +27,15 @@ export class UciEngine implements Engine {
   private handshakeDone = false;
   private appliedDifficultyId: string | undefined;
   private disposed = false;
+  /** Set after a timed-out search: its late "bestmove" must be drained before the next one. */
+  private needsResync = false;
+  private readonly searchGraceMs: number;
 
-  constructor(private readonly transport: UciTransport) {
+  constructor(
+    private readonly transport: UciTransport,
+    options: UciEngineOptions = {},
+  ) {
+    this.searchGraceMs = options.searchGraceMs ?? SEARCH_GRACE_MS;
     transport.onLine((line) => this.handleLine(line));
   }
 
@@ -40,7 +51,15 @@ export class UciEngine implements Engine {
       }
       this.send(`position fen ${fen}`);
       this.send(`go movetime ${difficulty.moveTimeMs}`);
-      const line = await this.waitFor((l) => l.startsWith("bestmove"), difficulty.moveTimeMs + SEARCH_GRACE_MS);
+      let line: string;
+      try {
+        line = await this.waitFor((l) => l.startsWith("bestmove"), difficulty.moveTimeMs + this.searchGraceMs);
+      } catch (error) {
+        // The engine may still answer this search later; stop it and resync first next time.
+        this.send("stop");
+        this.needsResync = true;
+        throw error;
+      }
       const move = line.split(/\s+/)[1];
       if (!move || move === "(none)") throw new Error("Engine returned no move");
       return move;
@@ -72,7 +91,14 @@ export class UciEngine implements Engine {
   }
 
   private async handshake(): Promise<void> {
-    if (this.handshakeDone) return;
+    if (this.handshakeDone) {
+      if (this.needsResync) {
+        // "readyok" arrives only after the stopped search's "bestmove", which no waiter claims.
+        await this.sync();
+        this.needsResync = false;
+      }
+      return;
+    }
     this.send("uci");
     await this.waitFor((line) => line === "uciok");
     await this.sync();
@@ -88,7 +114,7 @@ export class UciEngine implements Engine {
     this.transport.send(command);
   }
 
-  private waitFor(matches: (line: string) => boolean, timeoutMs = SEARCH_GRACE_MS): Promise<string> {
+  private waitFor(matches: (line: string) => boolean, timeoutMs = this.searchGraceMs): Promise<string> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiters = this.waiters.filter((w) => w !== waiter);

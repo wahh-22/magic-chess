@@ -3,13 +3,13 @@ import { DEFAULT_ANIMATION_CONFIG } from "../../config/animation";
 import type { Track } from "./planMove";
 import { sampleTrack } from "./sampleTrack";
 
-const config = { ...DEFAULT_ANIMATION_CONFIG, liftHeight: 0.2, knightHopHeight: 1.3, captureSinkDepth: 2.4 };
+const config = { ...DEFAULT_ANIMATION_CONFIG, liftHeight: 0.2, knightHopHeight: 1.3 };
 function track(kind: Track["kind"]): Track {
   return { pieceId: "piece", kind, startMs: 200, durationMs: 1000, from: [1, 2], to: [5, 6] };
 }
 
 describe("sampleTrack", () => {
-  it.each(["glide", "hop", "sink"] as const)("holds %s at its origin before and at start", (kind) => {
+  it.each(["glide", "hop"] as const)("holds %s at its origin before and at start", (kind) => {
     expect(sampleTrack(track(kind), -100, config)).toEqual({ x: 1, y: 0, z: 2, visible: true });
     expect(sampleTrack(track(kind), 200, config)).toEqual({ x: 1, y: 0, z: 2, visible: true });
   });
@@ -40,12 +40,11 @@ describe("sampleTrack", () => {
     }
   });
 
-  it("sinks at fixed x/z with ease-in and becomes hidden at and after end", () => {
-    const sinking = track("sink");
-    const middle = sampleTrack(sinking, 700, config);
-    expect(middle).toEqual({ x: 1, y: -0.6, z: 2, visible: true });
-    for (const elapsed of [1200, 5000]) {
-      expect(sampleTrack(sinking, elapsed, config)).toEqual({ x: 1, y: -2.4, z: 2, visible: false });
+  it("keeps a shattering piece in place until impact, then hides it", () => {
+    const shattering = { ...track("shatter"), durationMs: 0 };
+    expect(sampleTrack(shattering, 199, config)).toEqual({ x: 1, y: 0, z: 2, visible: true });
+    for (const elapsed of [200, 5000]) {
+      expect(sampleTrack(shattering, elapsed, config)).toEqual({ x: 1, y: 0, z: 2, visible: false });
     }
   });
 });
