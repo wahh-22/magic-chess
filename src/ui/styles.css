@@ -236,3 +236,18 @@ body,
   margin-top: 1.25rem;
   background: transparent;
 }
+
+.settings-bar {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(24, 22, 26, 0.85);
+  border: 1px solid rgba(201, 168, 106, 0.35);
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 20;
+}
