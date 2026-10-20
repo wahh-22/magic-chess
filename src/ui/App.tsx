@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { MuteToggle } from "../audio/MuteToggle";
 import { useGameSounds } from "../audio/useGameSounds";
 import type { MoveEvent } from "../core/types";
@@ -7,7 +7,6 @@ import { Board } from "../scene/Board";
 import { CinematicCamera } from "../scene/camera/CinematicCamera";
 import { planCinematicShot, qualifiesForCinematic, type CinematicShot } from "../scene/camera/cinematicShots";
 import { CinematicToggle, readCinematicEnabled } from "../scene/camera/CinematicToggle";
-import { DestructionLayer } from "../scene/effects/DestructionLayer";
 import { effectsStore } from "../scene/effects/effectsStore";
 import { ChessScene } from "../scene/ChessScene";
 import { Pieces } from "../scene/Pieces";
@@ -18,6 +17,12 @@ import { PromotionPicker } from "./PromotionPicker";
 import { SetupScreen } from "./SetupScreen";
 import { Hud } from "./Hud";
 import { GameOverScreen } from "./GameOverScreen";
+
+// Physics (Rapier + its WASM) is only needed at the first capture, so it loads in the
+// background instead of delaying the first frame. Bursts wait in the effects store.
+const DestructionLayer = lazy(() =>
+  import("../scene/effects/DestructionLayer").then((module) => ({ default: module.DestructionLayer })),
+);
 
 export function App() {
   const [models, setModels] = useState(createProceduralPieceProvider);
@@ -76,7 +81,9 @@ export function App() {
           onImpact={effectsStore.getState().addBurst}
           onPieceClick={selectSquare}
         />
-        <DestructionLayer pieces={pieces} activeEvent={activeEvent} provider={models} />
+        <Suspense fallback={null}>
+          <DestructionLayer pieces={pieces} activeEvent={activeEvent} provider={models} />
+        </Suspense>
       </ChessScene>
       {phase === "setup" ? <SetupScreen /> : <Hud />}
       {phase === "over" && <GameOverScreen />}
