@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "pieces": {
+    "p": {
+      "file": "p.glb",
+      "height": 0.800000011920929,
+      "footprint": 0.43634867668151855,
+      "triangles": 20000,
+      "fragmentColor": "#817d77"
+    },
+    "n": {
+      "file": "n.glb",
+      "height": 1,
+      "footprint": 0.5023159384727478,
+      "triangles": 19996,
+      "fragmentColor": "#7e7973"
+    },
+    "b": {
+      "file": "b.glb",
+      "height": 1.1500000953674316,
+      "footprint": 0.3415825068950653,
+      "triangles": 19998,
+      "fragmentColor": "#8a8781"
+    },
+    "r": {
+      "file": "r.glb",
+      "height": 0.8999999761581421,
+      "footprint": 0.4535101354122162,
+      "triangles": 20000,
+      "fragmentColor": "#86847d"
+    },
+    "q": {
+      "file": "q.glb",
+      "height": 1.3000000715255737,
+      "footprint": 0.5287972092628479,
+      "triangles": 20000,
+      "fragmentColor": "#8a8780"
+    },
+    "k": {
+      "file": "k.glb",
+      "height": 1.4500000476837158,
+      "footprint": 0.505953848361969,
+      "triangles": 19998,
+      "fragmentColor": "#8f8a85"
+    }
+  }
+}
