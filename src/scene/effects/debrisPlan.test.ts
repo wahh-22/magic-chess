@@ -48,6 +48,21 @@ describe("planDebris", () => {
     expect(Math.hypot(...small.impulse) / small.mass).toBeGreaterThan(Math.hypot(...large.impulse) / large.mass);
   });
 
+  it("keeps shipped launch speeds inside a short, local arc across sizes, directions and seeds", () => {
+    const chips = [0, 0.0001, 0.001, 0.01, 0.04].flatMap((volume) =>
+      fragments.map((part) => ({ ...part, volume })));
+    for (let seed = 1; seed <= 100; seed++) {
+      for (const direction of [[1, 0], [0, -1], [Math.SQRT1_2, Math.SQRT1_2]] as [number, number][]) {
+        const plans = planDebris(chips, victim, { ...impact, direction }, seed, DEFAULT_EFFECTS_CONFIG.debris);
+        plans.forEach(({ impulse, mass }) => {
+          expect(Math.hypot(impulse[0], impulse[2]) / mass).toBeLessThanOrEqual(2.5);
+          expect(impulse[1] / mass).toBeGreaterThan(0);
+          expect(impulse[1] / mass).toBeLessThanOrEqual(2.1);
+        });
+      }
+    }
+  });
+
   it("handles empty input and degenerate volumes without NaN", () => {
     expect(planDebris([], victim, impact, 0, config)).toEqual([]);
     const plan = planDebris([fragment([0, 0, 0], 0)], victim, impact, 0, config)[0]!;

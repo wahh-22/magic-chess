@@ -1,10 +1,10 @@
 {
   "debris": {
-    "impulseStrength": 1.8,
-    "upwardBias": 1.6,
-    "outwardStrength": 0.7,
-    "randomSpread": 0.3,
-    "torque": 2,
+    "impulseStrength": 0.8,
+    "upwardBias": 1.15,
+    "outwardStrength": 0.45,
+    "randomSpread": 0.18,
+    "torque": 1.6,
     "lifetimeMs": 2200,
     "fadeDurationMs": 900,
     "sinkDistance": 0.8,

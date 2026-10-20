@@ -34,7 +34,7 @@ export function App() {
           onImpact={effectsStore.getState().addBurst}
           onPieceClick={selectSquare}
         />
-        <DestructionLayer />
+        <DestructionLayer pieces={pieces} activeEvent={activeEvent} />
       </ChessScene>
       {phase === "setup" ? <SetupScreen /> : <Hud />}
       {phase === "over" && <GameOverScreen />}

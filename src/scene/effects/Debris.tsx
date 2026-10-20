@@ -12,7 +12,7 @@ import type { Burst } from "./effectsStore";
 const config = DEFAULT_EFFECTS_CONFIG.debris;
 const fractures = createVoronoiFractureProvider(createProceduralPieceProvider());
 const groundGroup = interactionGroups(0, [1]);
-// Fragments collide with the stage only, not each other or any live chess piece.
+// Fragments collide with fixed stage/piece proxies, never each other or live meshes.
 const debrisGroup = interactionGroups(1, [0]);
 
 /** Fixed stage: tile top y=0; the wider frame top is y=-0.02 (Board.tsx). */
@@ -21,6 +21,13 @@ export function DebrisGround() {
     <RigidBody type="fixed" colliders={false}>
       <CuboidCollider args={[4, 0.06, 4]} position={[0, -0.06, 0]} collisionGroups={groundGroup} friction={0.85} />
       <CuboidCollider args={[4.6, 0.12, 4.6]} position={[0, -0.14, 0]} collisionGroups={groundGroup} friction={0.85} />
+      {/* Decorative containment at the outside of the frame, including edge captures. */}
+      {([-1, 1] as const).map((side) => (
+        <group key={side}>
+          <CuboidCollider args={[0.1, 2, 4.6]} position={[side * 4.7, 1.98, 0]} collisionGroups={groundGroup} restitution={0} />
+          <CuboidCollider args={[4.6, 2, 0.1]} position={[0, 1.98, side * 4.7]} collisionGroups={groundGroup} restitution={0} />
+        </group>
+      ))}
     </RigidBody>
   );
 }
