@@ -1,12 +1,26 @@
 import { ContactShadows, Environment, Lightformer, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import type { ReactNode } from "react";
+import { Vector3 } from "three";
+import { squareToWorld } from "./coords";
 
-/** Development-only frame count so browser smoke tests can wait for a rendered scene. */
+/**
+ * Development-only hooks for browser tests: a frame count (wait for a rendered scene) and
+ * a projection of a point above a square to screen pixels (click squares, not fixed pixels).
+ */
 function DevFrameCounter() {
-  useFrame(() => {
-    const scope = globalThis as { __frames?: number };
+  useFrame(({ camera, size }) => {
+    const scope = globalThis as {
+      __frames?: number;
+      __projectSquare?: (square: string, height?: number) => [number, number];
+    };
     scope.__frames = (scope.__frames ?? 0) + 1;
+    // height 0 = the square itself; ~0.75 = the upper body of a piece standing on it.
+    scope.__projectSquare = (square, height = 0) => {
+      const [x, z] = squareToWorld(square);
+      const point = new Vector3(x, height, z).project(camera);
+      return [((point.x + 1) / 2) * size.width, ((1 - point.y) / 2) * size.height];
+    };
   });
   return null;
 }

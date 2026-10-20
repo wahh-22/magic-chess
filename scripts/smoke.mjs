@@ -52,11 +52,14 @@ await page.getByRole("button", { name: "Start game" }).click();
 await expectState("game starts", () => globalThis.__gameStore?.getState().phase === "playing");
 await expectState("scene renders", () => (globalThis.__frames ?? 0) > 20, 15000);
 
-// Default camera at 1280×800: the e2 pawn and the e4 square (measured from a screenshot).
-await page.mouse.click(687, 548);
+// Click where the squares appear on screen (projected with the real camera), so model
+// sizes or camera tweaks do not break the test.
+// Pieces are clicked on their upper body: a taller piece in front can hide the base.
+const project = (square, height = 0) => page.evaluate(([s, h]) => globalThis.__projectSquare(s, h), [square, height]);
+await page.mouse.click(...(await project("e2", 0.75)));
 await expectState("click selects e2", () => globalThis.__gameStore.getState().selected === "e2");
 
-await page.mouse.click(680, 425);
+await page.mouse.click(...(await project("e4")));
 await expectState("click on e4 starts the move", () => globalThis.__gameStore.getState().game.history()[0] === "e4");
 await page.waitForTimeout(250);
 await page.screenshot({ path: `${shots}/smoke-mid-move.png` });
