@@ -5,6 +5,8 @@ import { DEFAULT_ANIMATION_CONFIG } from "../config/animation";
 import type { MoveEvent, PieceInstance, Square } from "../core/types";
 import { planMove, type Impact } from "./animation/planMove";
 import { sampleTrack } from "./animation/sampleTrack";
+import { publishAnimatedPosition } from "./animation/animatedPositions";
+import { captureContactDistance, modelBounds } from "./effects/pieceColliders";
 import { squareToWorld } from "./coords";
 import { FACING } from "./facing";
 import { createProceduralPieceProvider } from "./pieces/proceduralPieces";
@@ -25,7 +27,10 @@ interface PiecesProps {
 export function Pieces({ pieces, activeEvent, onAnimationDone, onImpact, provider, onPieceClick }: PiecesProps) {
   const models = useMemo(() => provider ?? createProceduralPieceProvider(), [provider]);
   const meshes = useRef(new Map<string, Mesh>());
-  const plan = useMemo(() => (activeEvent ? planMove(activeEvent) : undefined), [activeEvent]);
+  const bounds = useMemo(() => modelBounds(models), [models]);
+  const plan = useMemo(() => (activeEvent
+    ? planMove(activeEvent, DEFAULT_ANIMATION_CONFIG, captureContactDistance(pieces, activeEvent, bounds))
+    : undefined), [activeEvent, pieces, bounds]);
   const playback = useRef<
     { plan: NonNullable<typeof plan>; startedAt?: number; impacted: boolean; done: boolean } | undefined
   >(undefined);
@@ -45,6 +50,7 @@ export function Pieces({ pieces, activeEvent, onAnimationDone, onImpact, provide
       const sample = sampleTrack(track, elapsed, DEFAULT_ANIMATION_CONFIG);
       mesh.position.set(sample.x, sample.y, sample.z);
       mesh.visible = sample.visible;
+      if (activeEvent && track.kind !== "shatter") publishAnimatedPosition(activeEvent, track.pieceId, sample);
     }
 
     if (plan.impact && !current.impacted && elapsed >= plan.impact.atMs) {
@@ -57,7 +63,7 @@ export function Pieces({ pieces, activeEvent, onAnimationDone, onImpact, provide
       current.done = true;
       onAnimationDone?.();
     }
-  });
+  }, -2); // Publish before the decorative proxies and the default-priority physics step.
 
   return (
     <group>

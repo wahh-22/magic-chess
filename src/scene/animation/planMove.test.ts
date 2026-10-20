@@ -3,6 +3,7 @@ import { DEFAULT_ANIMATION_CONFIG } from "../../config/animation";
 import type { MoveEvent } from "../../core/types";
 import { squareToWorld } from "../coords";
 import { planMove } from "./planMove";
+import { sampleTrack } from "./sampleTrack";
 
 function move(overrides: Partial<MoveEvent> = {}): MoveEvent {
   return {
@@ -65,6 +66,46 @@ describe("planMove", () => {
     });
     expect(plan.impact!.direction[0]).toBeCloseTo(-Math.SQRT1_2);
     expect(plan.impact!.direction[1]).toBeCloseTo(-Math.SQRT1_2);
+  });
+
+  it.each([
+    ["straight glide", "a1", "a4", "a4"],
+    ["diagonal capture", "e4", "d5", "d5"],
+    ["knight hop", "b1", "c3", "c3"],
+  ])("shatters at first horizontal contact for a %s", (_name, from, to, square) => {
+    const radiusSum = 0.6;
+    const plan = planMove(move({ from, to, captured: { pieceId: "victim", square } }), config, radiusSum);
+    const at = plan.impact!.atMs;
+    const track = plan.tracks[0]!;
+    const [x, z] = squareToWorld(square);
+    const distance = (t: number) => {
+      const p = sampleTrack(track, t, config);
+      return Math.hypot(p.x - x, p.z - z);
+    };
+    expect(distance(at)).toBeCloseTo(radiusSum, 8);
+    expect(distance(at - 0.001)).toBeGreaterThan(radiusSum);
+    expect(at).toBeLessThanOrEqual(track.durationMs);
+    expect(plan.tracks[1]!.startMs).toBe(at);
+    // App's camera target uses the legacy planner: timing must not change its aim.
+    const legacy = planMove(move({ from, to, captured: { pieceId: "victim", square } }));
+    expect(plan.impact!.position).toEqual(legacy.impact!.position);
+    expect(plan.impact!.direction).toEqual(legacy.impact!.direction);
+    expect(sampleTrack(plan.tracks[1]!, at, config).visible).toBe(false);
+  });
+
+  it("falls back to arrival minus lead for never-touching en passant", () => {
+    const event = move({ from: "e5", to: "d6", captured: { pieceId: "victim", square: "d5" } });
+    expect(planMove(event, config, 0.6).impact!.atMs).toBe(planMove(event, config).impact!.atMs);
+  });
+
+  it("finds off-destination contact before the closest approach, or immediate contact at the start", () => {
+    const event = move({ from: "a1", to: "a5", captured: { pieceId: "victim", square: "b3" } });
+    const plan = planMove(event, config, 1.1);
+    const p = sampleTrack(plan.tracks[0]!, plan.impact!.atMs, config);
+    const [x, z] = squareToWorld("b3");
+    expect(Math.hypot(p.x - x, p.z - z)).toBeCloseTo(1.1, 8);
+    expect(plan.impact!.atMs).toBeLessThan(plan.tracks[0]!.durationMs / 2);
+    expect(planMove(event, config, 3).impact!.atMs).toBe(0);
   });
 
   it("has no impact for quiet moves", () => {
