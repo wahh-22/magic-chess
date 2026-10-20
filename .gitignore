@@ -1,0 +1,7 @@
+node_modules
+dist
+*.tsbuildinfo
+.atl
+.DS_Store
+coverage
+public/stockfish
