@@ -38,6 +38,8 @@ const slots = [
   ['Occlusion', [255, 255, 255, 255]],
 ];
 
+const WEBP_QUALITY = { Normal: 90, MetallicRoughness: 88 };
+
 // A bounded atlas lets differently textured input primitives share one PBR material.
 // Edge padding keeps bilinear sampling inside the correct tile at UV seams.
 async function atlasMaterials(document, materials, textureSize) {
@@ -89,8 +91,10 @@ async function atlasMaterials(document, materials, textureSize) {
         .extend({ top: 2, bottom: 2, left: 2, right: 2, extendWith: 'copy' }).png().toBuffer();
       images.push({ input, left: (i % grid) * tile, top: Math.floor(i / grid) * tile });
     }
+    // Pieces are opaque, so drop alpha. Lossy WebP is ~6-8x smaller than lossless and
+    // indistinguishable on stone; normals get a higher quality to avoid shading artifacts.
     const image = await sharp({ create: { width: size, height: size, channels: 4, background: '#ffffff' } })
-      .composite(images).webp({ lossless: true }).toBuffer();
+      .composite(images).removeAlpha().webp({ quality: WEBP_QUALITY[slot] ?? 82 }).toBuffer();
     const texture = document.createTexture(slot).setMimeType('image/webp').setImage(image);
     material[`set${slot}Texture`](texture);
   }

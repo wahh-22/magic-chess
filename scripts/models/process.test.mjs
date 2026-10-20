@@ -111,8 +111,22 @@ describe('model cleanup', () => {
       expect(meta.height).toBeLessThanOrEqual(16);
     }
     const mr = await sharp(output.getMetallicRoughnessTexture().getImage()).raw().toBuffer();
-    expect(mr[1]).toBe(64);
-    expect(mr[2]).toBe(32);
+    // Lossy WebP may shift packed channel values slightly; ±4 of 255 is visually irrelevant.
+    expect(Math.abs(mr[1] - 64)).toBeLessThanOrEqual(4);
+    expect(Math.abs(mr[2] - 32)).toBeLessThanOrEqual(4);
+  });
+  it('writes lossy, opaque WebP textures so models stay small', async () => {
+    const doc = await messyDocument();
+    doc.getRoot().listMaterials()[0].setNormalTexture(doc.getRoot().listTextures()[0]);
+    const { document } = await processDocument(doc, { ...options, textureSize: 64 });
+    const material = document.getRoot().listMaterials()[0];
+    for (const name of ['BaseColor', 'Normal']) {
+      const bytes = Buffer.from(material[`get${name}Texture`]().getImage());
+      // RIFF chunk ids: 'VP8 ' is lossy, 'VP8L' is lossless, 'ALPH' is an alpha channel.
+      expect(bytes.includes(Buffer.from('VP8 '))).toBe(true);
+      expect(bytes.includes(Buffer.from('VP8L'))).toBe(false);
+      expect(bytes.includes(Buffer.from('ALPH'))).toBe(false);
+    }
   });
   it('skips missing files with warnings; names invalid GLB files clearly', async () => {
     await mkdir('.shots', { recursive: true });
