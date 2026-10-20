@@ -6,3 +6,4 @@ dist
 coverage
 public/stockfish
 .shots
+.vitest
