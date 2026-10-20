@@ -38,6 +38,17 @@ async function expectState(step, predicate, timeout = 5000) {
     .then(() => true, () => false);
   console.log(`${ok ? "PASS" : "FAIL"} ${step}`, await state());
   if (!ok) {
+    console.log("diagnostics:", await page.evaluate(() => {
+      const canvas = document.createElement("canvas");
+      const gl = canvas.getContext("webgl2");
+      const info = gl?.getExtension("WEBGL_debug_renderer_info");
+      return {
+        frames: globalThis.__frames ?? 0,
+        webgl2: Boolean(gl),
+        renderer: gl && info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : null,
+        sceneCanvas: Boolean(document.querySelector("canvas")),
+      };
+    }));
     await page.screenshot({ path: `${shots}/smoke-fail.png` });
     console.log("errors:", errors);
     await browser.close();

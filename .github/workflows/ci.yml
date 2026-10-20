@@ -67,3 +67,4 @@ jobs:
             .shots/
             dev-server.log
           if-no-files-found: ignore
+          include-hidden-files: true
