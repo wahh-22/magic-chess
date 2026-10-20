@@ -1,14 +1,26 @@
 import { Document, NodeIO } from '@gltf-transform/core';
-import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
-import { weld } from '@gltf-transform/functions';
-import { MeshoptDecoder, MeshoptSimplifier } from 'meshoptimizer';
+import { ALL_EXTENSIONS, EXTMeshoptCompression, EXTTextureWebP } from '@gltf-transform/extensions';
+import { reorder, weld } from '@gltf-transform/functions';
+import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import { BufferGeometry, BufferAttribute, Matrix4 } from 'three';
 import sharp from 'sharp';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve, basename, join } from 'node:path';
 
 export function createIO() {
-  return new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder });
+  return new NodeIO().registerExtensions(ALL_EXTENSIONS)
+    .registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
+}
+
+/**
+ * Lossless meshopt compression. Quantization is deliberately not used: it moves scale and
+ * offset into the node transform, while the loader contract reads normalized geometry only.
+ */
+export async function compressDocument(document) {
+  await MeshoptEncoder.ready;
+  await document.transform(reorder({ encoder: MeshoptEncoder, target: 'size' }));
+  document.createExtension(EXTMeshoptCompression).setRequired(true)
+    .setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE });
 }
 
 function validateOptions(options) {
@@ -221,6 +233,7 @@ export async function processModels({ source, out, manifest, warn = console.warn
     }
     try {
       const processed = await processDocument(await io.readBinary(new Uint8Array(bytes)), { ...manifest, height: manifest.heights[type], rotationYDegrees: settings.rotationYDegrees });
+      await compressDocument(processed.document);
       const binary = await io.writeBinary(processed.document);
       result.pieces[type] = { file: `${type}.glb`, ...processed.entry };
       outputs.push({ type, binary, file, before: processed.trianglesBefore, after: processed.entry.triangles });

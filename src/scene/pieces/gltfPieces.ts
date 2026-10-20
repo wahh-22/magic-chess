@@ -1,5 +1,6 @@
 import { Mesh, MeshStandardMaterial, Vector3 } from "three";
 import type { BufferGeometry, Group } from "three";
+import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { Color, PieceType } from "../../core/types";
 import type { PieceModelProvider } from "./PieceModelProvider";
@@ -73,7 +74,8 @@ function tinted(material: MeshStandardMaterial): MeshStandardMaterial {
 /** Optional assets must never prevent a playable game. Dependencies are injectable for synthetic tests. */
 export async function loadPieceModels({
   fetch: fetchManifest = (url) => fetch(url, { headers: { Accept: "text/html, application/json" } }),
-  load = (url) => new GLTFLoader().loadAsync(url),
+  // Processed models use EXT_meshopt_compression (scripts/models/process.mjs).
+  load = (url) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url),
   fallback = createProceduralPieceProvider(),
   warn = (message, error) => console.warn(message, error),
 }: LoadOptions = {}): Promise<PieceModelProvider> {

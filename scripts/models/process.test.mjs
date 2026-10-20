@@ -4,7 +4,7 @@ import { BoxGeometry } from 'three';
 import sharp from 'sharp';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
-import { processDocument, processModels, createIO } from './process.mjs';
+import { compressDocument, processDocument, processModels, createIO } from './process.mjs';
 
 export async function messyDocument({ wide = false, differentMaterials = false } = {}) {
   const doc = new Document();
@@ -114,6 +114,21 @@ describe('model cleanup', () => {
     // Lossy WebP may shift packed channel values slightly; ±4 of 255 is visually irrelevant.
     expect(Math.abs(mr[1] - 64)).toBeLessThanOrEqual(4);
     expect(Math.abs(mr[2] - 32)).toBeLessThanOrEqual(4);
+  });
+  it('compresses geometry with meshopt and keeps shape and triangles after decoding', async () => {
+    const { document, entry } = await processDocument(await messyDocument(), options);
+    const before = bounds(document);
+    await compressDocument(document);
+    const binary = await createIO().writeBinary(document);
+    const decoded = await createIO().readBinary(binary);
+    expect(decoded.getRoot().listExtensionsUsed().map((e) => e.extensionName)).toContain('EXT_meshopt_compression');
+    const primitive = decoded.getRoot().listMeshes()[0].listPrimitives()[0];
+    expect(primitive.getIndices().getCount() / 3).toBe(entry.triangles);
+    const after = bounds(decoded);
+    for (let axis = 0; axis < 3; axis++) {
+      expect(Math.abs(after.min[axis] - before.min[axis])).toBeLessThan(0.002);
+      expect(Math.abs(after.max[axis] - before.max[axis])).toBeLessThan(0.002);
+    }
   });
   it('writes lossy, opaque WebP textures so models stay small', async () => {
     const doc = await messyDocument();
