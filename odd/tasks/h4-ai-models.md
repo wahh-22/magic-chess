@@ -17,10 +17,10 @@ Replace the procedural placeholder pieces with realistic models generated with A
 | ID | Specs | Task | Route | Status | Commit |
 |----|-------|------|-------|--------|--------|
 | T1 | S3 | Generation guide with six prompts and settings (`docs/models/generation-guide.md`). | inline | done | — |
-| T2 | S4 | `scripts/process-models.mjs` (`pnpm models`): read `assets/models/source/*.glb` + manifest, join meshes, center x/z, base at y = 0, face +x, scale to per-type height, simplify, resize/compress textures, write `public/models/<type>.glb` + `public/models/manifest.json`. Tested on a synthetic messy fixture. | worker A | done | 5f62600 |
-| T3 | S2, S6 | `GltfPieceProvider` behind `PieceModelProvider` (geometry + material per type and color; black = tinted copy), loaded from the manifest with procedural fallback; fragment/collider sizing from the loaded geometry; materials for fragments without UV issues. | worker B | done | 8e9f215 |
+| T2 | S4 | `scripts/process-models.mjs` (`pnpm models`): read `assets/models/source/*.glb` + manifest, join meshes, center x/z, base at y = 0, face +x, scale to per-type height, simplify, resize/compress textures, write `public/models/<type>.glb` + `public/models/manifest.json`. Tested on a synthetic messy fixture. | worker A | done | fbdb378 |
+| T3 | S2, S6 | `GltfPieceProvider` behind `PieceModelProvider` (geometry + material per type and color; black = tinted copy), loaded from the manifest with procedural fallback; fragment/collider sizing from the loaded geometry; materials for fragments without UV issues. | worker B | done | c75b9ac |
 | T4 | S6 | Fixture set: procedural pieces exported to messy GLBs, run through the pipeline, played in the browser; regression (smoke, scenarios) and screenshots. | inline | done | (verification only) |
-| T5 | S1, S3 | Real models from the user: process, tune heights/orientation in the manifest, record license, screenshots. | inline | done (license pending) | 0619b7e, 3f5b69f, 625c66c |
+| T5 | S1, S3 | Real models from the user: process, tune heights/orientation in the manifest, record license, screenshots. | inline | done (license pending) | d12c10a, 19481e6, f2297e2 |
 
 ## Log
 

@@ -19,12 +19,12 @@ last-move highlight, undo, chess clock, and save/load. Architecture and decision
 
 | ID | Specs | Task | Route | Status | Commit |
 |----|-------|------|-------|--------|--------|
-| T1 | S4, S8 | Undo in `GameState` (piece ids restored) and store (`undo` per D8, blocked while animating/thinking, clears effects); HUD button. | worker A | done | d36338a |
-| T2 | S5, S8 | Chess clock: pure clock model in core (presets, increment, flag fall, insufficient-material draw), new timeout outcomes, store + setup option + HUD display. | worker A | done | d36338a |
-| T3 | S6, S8 | Autosave to localStorage + "Continue game" on setup; PGN export (download) and import (file) with piece ids rebuilt by replay. | worker A | done | d36338a |
-| T4 | S3 | `SoundProvider` + Web Audio sampler, CC0 stone samples (license recorded), sounds for move, impact/shatter, debris landing, check, game end; mute toggle; autoplay unlock. | worker B | done | 86185d7 |
-| T5 | S2 | Cinematic camera on captures of non-pawn pieces and on checkmate (approach, hold, return; respects user orbit; toggle) + last-move highlight on the board. | worker C | done | dd06242 (integration in T6) |
-| T6 | S1–S8 | Integration in App, attacker-overlaps-debris polish, scenarios extended (undo, clock timeout, save/resume, PGN round trip), screenshots, close H3. | inline | done | 6035b35, 2b69049 |
+| T1 | S4, S8 | Undo in `GameState` (piece ids restored) and store (`undo` per D8, blocked while animating/thinking, clears effects); HUD button. | worker A | done | c231c75 |
+| T2 | S5, S8 | Chess clock: pure clock model in core (presets, increment, flag fall, insufficient-material draw), new timeout outcomes, store + setup option + HUD display. | worker A | done | c231c75 |
+| T3 | S6, S8 | Autosave to localStorage + "Continue game" on setup; PGN export (download) and import (file) with piece ids rebuilt by replay. | worker A | done | c231c75 |
+| T4 | S3 | `SoundProvider` + Web Audio sampler, CC0 stone samples (license recorded), sounds for move, impact/shatter, debris landing, check, game end; mute toggle; autoplay unlock. | worker B | done | 6f9f907 |
+| T5 | S2 | Cinematic camera on captures of non-pawn pieces and on checkmate (approach, hold, return; respects user orbit; toggle) + last-move highlight on the board. | worker C | done | 69a5907 (integration in T6) |
+| T6 | S1–S8 | Integration in App, attacker-overlaps-debris polish, scenarios extended (undo, clock timeout, save/resume, PGN round trip), screenshots, close H3. | inline | done | 7708d0f, ed84635 |
 
 ## Log
 
