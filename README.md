@@ -45,6 +45,11 @@ run on demand: *Actions → CI → Run workflow → scenarios*.
 - `docs/architecture.md` — design principles and decisions D1–D12.
 - `docs/models/generation-guide.md` — how the piece models were generated.
 
+## License
+
+The game's source code is released under the [MIT License](LICENSE). Third-party
+assets and the chess engine keep their own licenses, listed below.
+
 ## Credits and licenses
 
 - **Piece models:** generated with [Meshy](https://www.meshy.ai). The knight and rook
