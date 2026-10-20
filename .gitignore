@@ -7,3 +7,8 @@ coverage
 public/stockfish
 .shots
 .vitest
+# Raw generator exports are opt-in after license review; keep setup/license notes.
+assets/models/source/*
+!assets/models/source/README.md
+!assets/models/source/LICENSE.md
+# public/models is intentionally tracked: cleaned assets ship with the game.
