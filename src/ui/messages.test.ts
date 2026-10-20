@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GameOutcome } from "../core/types";
-import { describeError, describeOutcome, turnLabel } from "./messages";
+import { describeError, describeOutcome, statusLabel, turnLabel } from "./messages";
 
 describe("describeOutcome", () => {
   it.each<[GameOutcome, string]>([
@@ -39,5 +39,16 @@ describe("turnLabel", () => {
     ["b", true, "Black to move — check!"],
   ] as const)("labels %s with check=%s", (color, inCheck, expected) => {
     expect(turnLabel(color, inCheck)).toBe(expected);
+  });
+});
+
+describe("statusLabel", () => {
+  it("shows whose turn it is while the game is running", () => {
+    expect(statusLabel("b", true, null)).toBe("Black to move — check!");
+  });
+
+  it("shows the result instead of the turn once the game is over", () => {
+    expect(statusLabel("b", true, { kind: "checkmate", winner: "w" })).toBe("Checkmate — White wins");
+    expect(statusLabel("w", false, { kind: "stalemate" })).toBe("Stalemate — draw");
   });
 });

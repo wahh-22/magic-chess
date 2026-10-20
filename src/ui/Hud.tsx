@@ -1,5 +1,5 @@
 import { useGameStore } from "./gameStore";
-import { describeError, isEngineError, turnLabel } from "./messages";
+import { describeError, isEngineError, statusLabel } from "./messages";
 
 export function Hud() {
   const state = useGameStore((state) => state);
@@ -10,7 +10,7 @@ export function Hud() {
 
   return (
     <aside className="stone-panel hud" aria-label="Game information">
-      <p className="turn-label" role="status">{turnLabel(game.turn(), game.inCheck())}</p>
+      <p className="turn-label" role="status">{statusLabel(game.turn(), game.inCheck(), state.outcome)}</p>
       {aiThinking && <p role="status">Engine is thinking…</p>}
       {lastError && <div className="game-error" role="alert">
         <p>{describeError(lastError)}</p>

@@ -32,3 +32,8 @@ export function describeError(code: string): string {
 export function turnLabel(color: Color, inCheck: boolean): string {
   return `${colorName(color)} to move${inCheck ? " — check!" : ""}`;
 }
+
+/** HUD status: the turn while playing, the result once the game is over. */
+export function statusLabel(color: Color, inCheck: boolean, outcome: GameOutcome | null): string {
+  return outcome ? describeOutcome(outcome) : turnLabel(color, inCheck);
+}
