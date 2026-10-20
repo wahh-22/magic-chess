@@ -1,0 +1,78 @@
+# Pinned actions (commit SHA + "# vX.Y.Z" comment) exceed 80 columns by design.
+# yamllint disable rule:line-length
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      scenarios:
+        description: Also run the slow browser scenarios (about 10 minutes)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Unit tests, types, lint, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm build
+
+  browser:
+    name: Browser smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: checks
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Runners ship Google Chrome; the scripts use it through
+      # Playwright's "chrome" channel.
+      - name: Start the dev server
+        run: |
+          pnpm dev --port 5173 --strictPort > dev-server.log 2>&1 &
+          timeout 60 bash -c \
+            'until curl -sf localhost:5173 > /dev/null; do sleep 1; done'
+      - run: node scripts/smoke.mjs
+        env:
+          TIMEOUT_SCALE: 4
+      - if: ${{ github.event_name == 'workflow_dispatch' && inputs.scenarios }}
+        run: node scripts/scenarios.mjs
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-evidence
+          path: |
+            .shots/
+            dev-server.log
+          if-no-files-found: ignore
+          include-hidden-files: true

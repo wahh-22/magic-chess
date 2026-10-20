@@ -4,6 +4,8 @@ import { mkdirSync } from "node:fs";
 import { chromium } from "playwright";
 
 const url = process.argv[2] ?? "http://localhost:5173/";
+// Software rendering on CI runners can be several times slower than a local machine.
+const TIMEOUT_SCALE = Number(process.env.TIMEOUT_SCALE ?? 1);
 const shots = ".shots";
 mkdirSync(shots, { recursive: true });
 
@@ -34,10 +36,21 @@ const state = () =>
 /** Waits for a store condition; on timeout prints the state and exits non-zero. */
 async function expectState(step, predicate, timeout = 5000) {
   const ok = await page
-    .waitForFunction(predicate, undefined, { timeout })
+    .waitForFunction(predicate, undefined, { timeout: timeout * TIMEOUT_SCALE })
     .then(() => true, () => false);
   console.log(`${ok ? "PASS" : "FAIL"} ${step}`, await state());
   if (!ok) {
+    console.log("diagnostics:", await page.evaluate(() => {
+      const canvas = document.createElement("canvas");
+      const gl = canvas.getContext("webgl2");
+      const info = gl?.getExtension("WEBGL_debug_renderer_info");
+      return {
+        frames: globalThis.__frames ?? 0,
+        webgl2: Boolean(gl),
+        renderer: gl && info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : null,
+        sceneCanvas: Boolean(document.querySelector("canvas")),
+      };
+    }));
     await page.screenshot({ path: `${shots}/smoke-fail.png` });
     console.log("errors:", errors);
     await browser.close();
@@ -50,7 +63,8 @@ await expectState("setup screen opens", () => globalThis.__gameStore?.getState()
 await page.screenshot({ path: `${shots}/smoke-setup.png` });
 await page.getByRole("button", { name: "Start game" }).click();
 await expectState("game starts", () => globalThis.__gameStore?.getState().phase === "playing");
-await expectState("scene renders", () => (globalThis.__frames ?? 0) > 20, 15000);
+// A few frames are enough: clicks are projected with the live camera, not fixed pixels.
+await expectState("scene renders", () => (globalThis.__frames ?? 0) > 5, 15000);
 
 // Click where the squares appear on screen (projected with the real camera), so model
 // sizes or camera tweaks do not break the test.

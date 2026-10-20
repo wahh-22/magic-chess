@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "copy-engine": "node scripts/copy-stockfish.mjs",
     "models": "node scripts/process-models.mjs",
