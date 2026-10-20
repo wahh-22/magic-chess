@@ -1,0 +1,15 @@
+{
+  "dust": {
+    "count": 70,
+    "lifetimeMs": 1700,
+    "maxDelayMs": 120,
+    "speed": 1.6,
+    "directionBias": 0.6,
+    "rise": 0.35,
+    "drag": 3,
+    "startSize": 0.18,
+    "endSize": 0.75,
+    "opacity": 0.55,
+    "color": "#bdb3a2"
+  }
+}
