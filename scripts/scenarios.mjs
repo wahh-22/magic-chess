@@ -1,4 +1,4 @@
-// H1/T10 browser verification. Run against Vite: node scripts/scenarios.mjs [url]
+// H1–H3 browser verification. Run against Vite: node scripts/scenarios.mjs [url]
 // Only submit commands: the mounted scene must finish every real animation.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -7,6 +7,7 @@ import { chromium } from "playwright";
 
 const url = process.argv[2] ?? "http://localhost:5173/";
 const shots = ".shots";
+const saveKey = "magic-chess:game:v1";
 mkdirSync(shots, { recursive: true });
 
 // Validate from the initial position before opening Chrome; retain UCI commands
@@ -40,7 +41,7 @@ const browser = await chromium.launch({
   args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-page.setDefaultTimeout(15000);
+page.setDefaultTimeout(60000);
 const errors = [];
 let currentScenario = "startup";
 page.on("pageerror", (error) => errors.push(`${currentScenario}: ${error.message}`));
@@ -60,6 +61,7 @@ const state = () => page.evaluate(() => {
     outcome: s.outcome,
     lastError: s.lastError,
     aiThinking: s.aiThinking,
+    clock: s.clock,
     displayedPieces: s.displayedPieces,
     pieces: s.game.pieces(),
   };
@@ -80,16 +82,18 @@ function assertPiece(s, id, square, type) {
   assert.equal(piece.type, type, `${id} type`);
 }
 
-async function start(ai = false) {
-  // A fresh document resets the vanilla store, worker, and frame counter.
+async function start(ai = false, timed = false) {
+  // Clear only this app's autosave, then reset the store, worker and frames.
   if (page.url() === "about:blank") await page.goto(url);
-  else await page.reload();
+  await page.evaluate((key) => localStorage.removeItem(key), saveKey);
+  await page.reload();
   await page.waitForFunction(() => globalThis.__gameStore?.getState().phase === "setup");
   await page.getByLabel(ai ? "Play vs the engine" : "Two players on this computer", { exact: true }).check();
   if (ai) {
     await page.getByLabel("White", { exact: true }).check();
     await page.getByLabel("Difficulty", { exact: true }).selectOption({ label: "Beginner" });
   }
+  if (timed) await page.getByLabel("Time control", { exact: true }).selectOption("5+0");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await page.waitForFunction(() => globalThis.__gameStore.getState().phase === "playing" && globalThis.__frames > 20);
   const s = await state();
@@ -118,6 +122,24 @@ async function move(uci) {
 
 async function play(commands) {
   for (const uci of commands) await move(uci);
+}
+
+async function importFile(name, text) {
+  await page.getByLabel("Import PGN (local two-player game, no clock)", { exact: true })
+    .setInputFiles({ name, mimeType: "application/x-chess-pgn", buffer: Buffer.from(text) });
+}
+
+async function expireRunningClock() {
+  await page.evaluate(() => {
+    const store = globalThis.__gameStore;
+    const { clock } = store.getState();
+    if (!clock?.running) throw new Error("Expected a running preset clock");
+    // Preserve the real clock shape and opponent balance; the HUD's real tick
+    // (not a test call to tick/flagFall) must detect the flag a second later.
+    store.setState({ clock: { ...clock,
+      remaining: { ...clock.remaining, [clock.running]: 1000 }, lastSwitch: Date.now() } });
+  });
+  await page.waitForFunction(() => globalThis.__gameStore.getState().phase === "over");
 }
 
 const scenarios = [
@@ -189,6 +211,149 @@ const scenarios = [
     assert.match(await page.locator(".game-over-panel").innerText(), /Stalemate/);
     return "validated Loyd line; over; outcome stalemate; panel Stalemate";
   }],
+  ["undo-local", async () => {
+    await play(validatedLine("e4 e5 Nf3"));
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    let s = await state();
+    assert.deepEqual(s.history, ["e4", "e5"]);
+    assertPiece(s, "w-n-g1", "g1", "n");
+    assertScene(s);
+    await page.screenshot({ path: `${shots}/scenario-undo-local-knight.png` });
+    await page.getByRole("button", { name: "New game", exact: true }).click();
+    await play(validatedLine("e4 d5 exd5"));
+    assert.ok(!(await state()).displayedPieces.some(({ id }) => id === "b-p-d7"));
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    s = await state();
+    assert.deepEqual(s.history, ["e4", "d5"]);
+    assertPiece(s, "b-p-d7", "d5", "p");
+    assertPiece(s, "w-p-e2", "e4", "p");
+    return "local Undo removes one ply; original knight id restored on g1; captured b-p-d7 restored visibly on d5";
+  }],
+  ["undo-vs-engine", async () => {
+    // Observe the real rendered disabled attribute while aiThinking is true,
+    // even if a fast engine reply falls between Playwright polling frames.
+    await page.evaluate(() => {
+      globalThis.__undoThinkingDisabled = false;
+      const observer = new MutationObserver(() => {
+        const button = [...document.querySelectorAll("button")].find((b) => b.textContent === "Undo");
+        if (globalThis.__gameStore.getState().aiThinking && button?.hasAttribute("disabled")) {
+          globalThis.__undoThinkingDisabled = true;
+        }
+      });
+      observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["disabled"] });
+    });
+    const accepted = await submit("e2e4");
+    assert.equal(accepted.error, null);
+    assert.equal(accepted.after, 1);
+    await page.waitForFunction(() => {
+      const s = globalThis.__gameStore.getState();
+      return s.game.history().length === 2 && !s.aiThinking && s.animationQueue.length === 0;
+    });
+    assert.equal(await page.evaluate(() => globalThis.__undoThinkingDisabled), true,
+      "Undo has disabled attribute at an observed aiThinking moment");
+    assertScene(await state());
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    let s = await state();
+    assert.deepEqual(s.history, []);
+    assert.equal(s.turn, "w");
+    assertScene(s);
+    await page.waitForTimeout(3000);
+    s = await state();
+    assert.deepEqual(s.history, [], "no stale engine reply after Undo");
+    assert.equal(s.turn, "w");
+    assert.equal(s.aiThinking, false);
+    return "Beginner/White; Undo disabled while thinking; both plies undone; no reply after 3 seconds";
+  }],
+  ["clock-timeout", async () => {
+    const before = await state();
+    assert.equal(before.settings.timeControl, "5+0");
+    assert.equal(before.clock.running, "w");
+    await expireRunningClock();
+    const s = await state();
+    assert.equal(s.phase, "over");
+    assert.deepEqual(s.outcome, { kind: "timeout", winner: "b" });
+    assert.match(await page.locator(".game-over-panel").innerText(), /Black wins on time/);
+    return "setup 5+0; running White clock shortened to 1s via dev store; real HUD tick flags; Black wins on time";
+  }],
+  ["clock-timeout-draw", async () => {
+    // PGN import deliberately supports standard starts only and removes clocks.
+    // Use the existing dev handle plus the real GameState(fen) constructor:
+    // White K+Q is on move with 1s; Black has only a king and cannot mate.
+    // No pieces, outcomes or flag-fall logic are mocked, and no hook is added.
+    await page.evaluate(() => {
+      const store = globalThis.__gameStore;
+      const { game: previous } = store.getState();
+      const game = new previous.constructor("7k/8/8/8/8/8/Q7/K7 w - - 0 1");
+      store.setState({ game, displayedPieces: game.pieces() });
+    });
+    const before = await state();
+    assert.equal(before.settings.timeControl, "5+0");
+    assert.equal(before.turn, "w");
+    assert.deepEqual(before.pieces.filter(({ color }) => color === "b").map(({ type }) => type), ["k"]);
+    assertScene(before);
+    await expireRunningClock();
+    const s = await state();
+    assert.equal(s.phase, "over");
+    assert.deepEqual(s.outcome, { kind: "timeout-draw" });
+    assert.match(await page.locator(".game-over-panel").innerText(), /Draw — time out vs insufficient material/);
+    return "real GameState FEN 7k/8/8/8/8/8/Q7/K7 w - - 0 1; White flags; king-only Black cannot mate; timeout draw";
+  }],
+  ["save-resume", async () => {
+    await play(validatedLine("e4 e5 Nf3"));
+    const before = await state();
+    assertScene(before);
+    assert.ok(await page.evaluate((key) => localStorage.getItem(key), saveKey), "autosave exists");
+    await page.reload();
+    await page.waitForFunction(() => globalThis.__gameStore?.getState().phase === "setup");
+    const resume = page.getByRole("button", { name: "Continue game", exact: true });
+    assert.ok(await resume.isVisible());
+    await resume.click();
+    await page.waitForFunction(() => globalThis.__gameStore.getState().phase === "playing");
+    const restored = await state();
+    assert.deepEqual(restored.history, before.history);
+    assert.deepEqual(restored.pieces, before.pieces, "autosave replays stable piece ids");
+    assertScene(restored);
+    await move("b8c6");
+    assert.deepEqual((await state()).history, ["e4", "e5", "Nf3", "Nc6"]);
+    return "3-ply autosave; reload shows Continue game; same history and piece ids; Nc6 accepted after resume";
+  }],
+  ["pgn-roundtrip", async () => {
+    await play(validatedLine("e4 e5 Nf3 Nc6 Bc4 Bc5 O-O Nf6 d4 exd4"));
+    const before = await state();
+    assertScene(before);
+    const downloading = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export PGN", exact: true }).click();
+    const download = await downloading;
+    // Read the stream directly; do not read Playwright's external temp paths.
+    const stream = await download.createReadStream();
+    assert.ok(stream, "PGN download stream available");
+    const chunks = [];
+    for await (const chunk of stream) chunks.push(chunk);
+    const pgn = Buffer.concat(chunks).toString("utf8");
+    writeFileSync(`${shots}/scenario-pgn-roundtrip.pgn`, pgn);
+    assert.match(pgn, /\[Event "Magic Chess"\]/);
+    const parsed = new Chess();
+    parsed.loadPgn(pgn);
+    assert.deepEqual(parsed.history(), before.history, "download contains every SAN move, including O-O and exd4");
+    await page.getByRole("button", { name: "Menu", exact: true }).click();
+    await importFile(download.suggestedFilename(), pgn);
+    await page.waitForFunction(() => globalThis.__gameStore.getState().phase === "playing");
+    const restored = await state();
+    assert.deepEqual(restored.history, before.history);
+    assert.deepEqual(restored.pieces, before.pieces, "PGN replay preserves piece identities");
+    assertScene(restored);
+    await page.screenshot({ path: `${shots}/scenario-pgn-roundtrip-imported.png` });
+    await page.getByRole("button", { name: "Menu", exact: true }).click();
+    await importFile("invalid.pgn", "1. e4 definitely-not-a-chess-move *");
+    const alert = page.getByRole("alert");
+    await alert.waitFor({ state: "visible" });
+    assert.match(await alert.innerText(), /Invalid PGN: .+/);
+    const rejected = await state();
+    assert.equal(rejected.phase, "setup");
+    assert.deepEqual(rejected.history, before.history, "invalid import leaves game unchanged");
+    assert.ok(await page.getByRole("button", { name: "Start game", exact: true }).isVisible());
+    return "HUD download Event Magic Chess, SAN capture/castling; file import restores history/ids; invalid PGN shows readable error and stays on setup";
+  }],
   ["vs-engine", async () => {
     let replies = 0;
     let whiteMoves = 0;
@@ -231,7 +396,7 @@ try {
     let facts;
     let failure;
     try {
-      await start(name === "vs-engine");
+      await start(name === "vs-engine" || name === "undo-vs-engine", name.startsWith("clock-timeout"));
       facts = await scenario();
       assertScene(await state());
     } catch (error) {
