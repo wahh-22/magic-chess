@@ -4,6 +4,12 @@ A realistic 3D chess game in the browser, inspired by "wizard chess": carved sto
 pieces glide across the board on their own, and captured pieces shatter into debris
 and dust. Play against Stockfish or a friend on the same computer.
 
+**Play online: [chess.wahh.dev](https://chess.wahh.dev)**
+
+![White army in carved stone, close-up](docs/images/board-closeup.jpg)
+
+![A queen capture: the black queen shatters into stone debris](docs/images/queen-capture.jpg)
+
 ## Features
 
 - Full chess rules (castling, en passant, promotion, every draw rule).
@@ -33,7 +39,8 @@ Other commands:
 | `node scripts/scenarios.mjs` | Browser rule/feature scenarios (`SCENARIO=<name>` runs one) |
 | `pnpm models` | Cleans the piece models in `assets/models/source/` into `public/models/` |
 
-CI (GitHub Actions, `.github/workflows/ci.yml`) runs the unit tests, type check, lint,
+Every push to `main` is deployed to GitHub Pages (`.github/workflows/pages.yml`) at
+[chess.wahh.dev](https://chess.wahh.dev). CI (GitHub Actions, `.github/workflows/ci.yml`) runs the unit tests, type check, lint,
 build, and the browser smoke test on every pull request. The slower browser scenarios
 run on demand: *Actions → CI → Run workflow → scenarios*.
 
