@@ -20,8 +20,9 @@ export function App() {
   const animationDone = useGameStore((state) => state.animationDone);
   const gameId = useGameStore((state) => state.gameId);
 
-  // Leftover debris and dust belong to the previous game.
-  useEffect(() => effectsStore.getState().clear(), [gameId]);
+  const positionVersion = useGameStore((state) => state.positionVersion);
+  // Leftover debris and dust belong to the previous position/game.
+  useEffect(() => effectsStore.getState().clear(), [gameId, positionVersion]);
 
   return (
     <div className="app">

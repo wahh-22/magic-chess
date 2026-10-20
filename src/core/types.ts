@@ -27,6 +27,8 @@ export interface LegalMove {
 }
 
 export type GameOutcome =
+  | { kind: "timeout"; winner: Color }
+  | { kind: "timeout-draw" }
   | { kind: "checkmate"; winner: Color }
   | { kind: "stalemate" }
   | { kind: "insufficient-material" }

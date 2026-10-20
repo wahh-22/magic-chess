@@ -4,6 +4,8 @@ const colorName = (color: Color) => color === "w" ? "White" : "Black";
 
 export function describeOutcome(outcome: GameOutcome): string {
   switch (outcome.kind) {
+    case "timeout": return `${colorName(outcome.winner)} wins on time`;
+    case "timeout-draw": return "Draw — time out vs insufficient material";
     case "checkmate": return `Checkmate — ${colorName(outcome.winner)} wins`;
     case "stalemate": return "Stalemate — draw";
     case "insufficient-material": return "Draw by insufficient material";

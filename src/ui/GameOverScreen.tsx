@@ -1,7 +1,9 @@
-import { useGameStore } from "./gameStore";
+import { canUndo, useGameStore } from "./gameStore";
 import { describeOutcome } from "./messages";
 
 export function GameOverScreen() {
+  const undo = useGameStore((state) => state.undo);
+  const undoAllowed = useGameStore(canUndo);
   const outcome = useGameStore((state) => state.outcome);
   const settings = useGameStore((state) => state.settings);
   const startGame = useGameStore((state) => state.startGame);
@@ -13,6 +15,7 @@ export function GameOverScreen() {
       <section className="stone-panel game-over-panel" aria-labelledby="outcome-heading">
         <h2 id="outcome-heading">{describeOutcome(outcome)}</h2>
         <div className="panel-actions">
+          <button onClick={undo} disabled={!undoAllowed}>Undo</button>
           <button onClick={() => startGame(settings)}>Play again</button>
           <button onClick={backToSetup}>Menu</button>
         </div>
