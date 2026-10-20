@@ -1,3 +1,5 @@
+# Pinned actions (commit SHA + "# vX.Y.Z" comment) exceed 80 columns by design.
+# yamllint disable rule:line-length
 name: CI
 
 on:
