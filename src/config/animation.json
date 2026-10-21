@@ -6,5 +6,18 @@
   "liftHeight": 0.08,
   "captureImpactLeadMs": 120,
   "castlingRookDelayMs": 250,
-  "postMovePauseMs": 120
+  "postMovePauseMs": 120,
+  "attacks": {
+    "n": { "anticipationMs": 300, "hangMs": 70, "strikeMs": 130, "recoverMs": 220, "windupAngle": -0.48, "strikeAngle": 0.32, "height": 0.42, "retreat": 0.14 },
+    "r": { "anticipationMs": 300, "hangMs": 170, "strikeMs": 110, "recoverMs": 260, "windupAngle": 0, "strikeAngle": 0, "height": 0.85, "retreat": 0 },
+    "p": { "anticipationMs": 220, "hangMs": 40, "strikeMs": 100, "recoverMs": 180, "windupAngle": -0.22, "strikeAngle": 0.26, "height": 0.12, "retreat": 0.12 },
+    "b": { "anticipationMs": 240, "hangMs": 50, "strikeMs": 100, "recoverMs": 200, "windupAngle": -0.2, "strikeAngle": 0.24, "height": 0.14, "retreat": 0.12 },
+    "q": { "anticipationMs": 270, "hangMs": 70, "strikeMs": 110, "recoverMs": 220, "windupAngle": -0.2, "strikeAngle": 0.24, "height": 0.18, "retreat": 0.14 },
+    "k": { "anticipationMs": 280, "hangMs": 80, "strikeMs": 120, "recoverMs": 240, "windupAngle": -0.18, "strikeAngle": 0.22, "height": 0.18, "retreat": 0.14 }
+  },
+  "shake": {
+    "durationMs": 320,
+    "frequencyHz": 24,
+    "intensity": { "p": 0.035, "n": 0.075, "b": 0.045, "r": 0.12, "q": 0.09, "k": 0.085 }
+  }
 }

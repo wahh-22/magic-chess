@@ -126,6 +126,6 @@ export function CinematicCamera({ shot, enabled, onShotEnd }: CinematicCameraPro
       session.current = null;
       endCallback.current?.();
     }
-  });
+  }, -0.5); // After OrbitControls (-1), before additive impact shake (0).
   return null;
 }

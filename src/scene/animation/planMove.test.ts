@@ -53,7 +53,7 @@ describe("planMove", () => {
       pieceId: "victim", kind: "shatter", startMs: arrival - 75, durationMs: 0,
       from: squareToWorld(square), to: squareToWorld(square),
     });
-    expect(plan.durationMs).toBeCloseTo(arrival + 33);
+    expect(plan.durationMs).toBeCloseTo(Math.max(arrival, plan.attack!.endMs) + 33);
   });
 
   it("describes the impact with the victim position and the unit attack direction", () => {
