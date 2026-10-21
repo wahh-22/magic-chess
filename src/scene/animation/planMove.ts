@@ -11,6 +11,8 @@ export interface Track {
   durationMs: number;
   from: [number, number];
   to: [number, number];
+  /** Freeze at first contact while the skeletal attack runs, then finish the move. */
+  hold?: { atMs: number; durationMs: number };
 }
 
 /** The instant the attacker reaches its victim; destruction effects start here. */
@@ -28,6 +30,12 @@ export interface MovePlan {
   tracks: Track[];
   impact?: Impact;
   attack?: AttackChoreography;
+  skeletalAttack?: { pieceId: string; startMs: number; endMs: number };
+}
+
+export interface RigAttackTiming {
+  hitTimeMs: number;
+  clipDurationMs: number;
 }
 
 /** Earliest contact on the horizontal track, including off-destination victims.
@@ -60,7 +68,7 @@ function firstContactMs(track: Track, victim: [number, number], distance: number
  * contactDistance is the active provider's sum of attacker/victim proxy radii.
  * Omit it to retain legacy timing; paths that never touch also use that fallback.
  */
-export function planMove(event: MoveEvent, config: AnimationConfig = DEFAULT_ANIMATION_CONFIG, contactDistance?: number, attackerType: PieceType = "p"): MovePlan {
+export function planMove(event: MoveEvent, config: AnimationConfig = DEFAULT_ANIMATION_CONFIG, contactDistance?: number, attackerType: PieceType = "p", rig?: RigAttackTiming): MovePlan {
   const from = squareToWorld(event.from);
   const to = squareToWorld(event.to);
   const dx = Math.abs(to[0] - from[0]);
@@ -105,12 +113,20 @@ export function planMove(event: MoveEvent, config: AnimationConfig = DEFAULT_ANI
 
   // The strike is constrained by first contact (or the off-path fallback), not
   // arrival. Fit anticipation/lunge to that instant so every effect has one clock.
-  const attack = impact ? planAttack(event.pieceId, impact.atMs, config.attacks[attackerType]) : undefined;
+  const validRig = rig && Number.isFinite(rig.hitTimeMs) && Number.isFinite(rig.clipDurationMs) && rig.hitTimeMs >= 0 && rig.hitTimeMs <= rig.clipDurationMs && rig.clipDurationMs > 0;
+  const skeletalAttack = impact && validRig ? { pieceId: event.pieceId, startMs: impact.atMs, endMs: impact.atMs + rig.clipDurationMs } : undefined;
+  if (skeletalAttack && impact && rig) {
+    mover.hold = { atMs: skeletalAttack.startMs, durationMs: rig.clipDurationMs };
+    impact.atMs = skeletalAttack.startMs + rig.hitTimeMs;
+    tracks.find((track) => track.kind === "shatter")!.startMs = impact.atMs;
+  }
+  const attack = impact && !skeletalAttack ? planAttack(event.pieceId, impact.atMs, config.attacks[attackerType]) : undefined;
   if (attack) impact!.atMs = attack.strikeMs;
   return {
-    durationMs: Math.max(...tracks.map((track) => track.startMs + track.durationMs), attack?.endMs ?? 0) + config.postMovePauseMs,
+    durationMs: Math.max(...tracks.map((track) => track.startMs + track.durationMs + (track.hold?.durationMs ?? 0)), attack?.endMs ?? 0) + config.postMovePauseMs,
     tracks,
     ...(impact ? { impact } : {}),
     ...(attack ? { attack } : {}),
+    ...(skeletalAttack ? { skeletalAttack } : {}),
   };
 }

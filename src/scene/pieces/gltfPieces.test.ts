@@ -1,4 +1,4 @@
-import { BoxGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Texture } from "three";
+import { AnimationClip, Bone, BoxGeometry, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Skeleton, SkinnedMesh, Texture, Uint16BufferAttribute } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { createVoronoiFractureProvider } from "../fracture/voronoiFracture";
 import { modelBounds, planPieceColliders } from "../effects/pieceColliders";
@@ -20,6 +20,26 @@ const scene = (geometry = box(), material = new MeshStandardMaterial()) => {
 const fetchManifest = (value: unknown = manifest) => vi.fn(async () => new Response(JSON.stringify(value)));
 
 describe("glTF pieces (H4 S2, S6)", () => {
+  it("loads a rig and caches normalized bind-pose geometry for fracture and colliders", async () => {
+    const geometry = box();
+    const count = geometry.attributes.position!.count;
+    geometry.setAttribute("skinIndex", new Uint16BufferAttribute(new Uint16Array(count * 4), 4));
+    geometry.setAttribute("skinWeight", new Float32BufferAttribute(Array.from({ length: count }, () => [1, 0, 0, 0]).flat(), 4));
+    const bone = new Bone(); bone.name = "RightHand";
+    const mesh = new SkinnedMesh(geometry, new MeshStandardMaterial());
+    mesh.add(bone); mesh.bind(new Skeleton([bone]));
+    const root = new Group(); root.add(mesh);
+    root.scale.setScalar(0.5);
+    const rigEntry = { ...entry, height: 0.5, footprint: 0.3, skinned: true as const, clips: { idle: "idle", attack: "attack" }, hitTimeMs: 400, clipDurationMs: 1000 };
+    const animations = [new AnimationClip("idle", 2, []), new AnimationClip("attack", 1, [])];
+    const provider = await loadPieceModels({ fetch: fetchManifest({ version: 1, pieces: { p: rigEntry } }), load: async () => ({ scene: root, animations }) });
+    expect(provider.rig?.("p")?.scene).toBe(root);
+    expect(provider.rig?.("p")?.hitTimeMs).toBe(400);
+    expect(provider.geometry("p")).not.toBe(geometry);
+    expect(validateGeometry(provider.geometry("p"), rigEntry)).toBe(true);
+    expect(provider.geometry("p")).toBe(provider.geometry("p"));
+  });
+
   it("parses a valid manifest and ignores unknown types", () => {
     expect(parseManifest({ ...manifest, pieces: { p: entry, dragon: {} } })).toEqual({ p: entry });
   });

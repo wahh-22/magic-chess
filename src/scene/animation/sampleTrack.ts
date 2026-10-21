@@ -9,7 +9,8 @@ export interface TrackSample {
 }
 
 export function sampleTrack(track: Track, elapsedMs: number, config: AnimationConfig): TrackSample {
-  const elapsed = elapsedMs - track.startMs;
+  let elapsed = elapsedMs - track.startMs;
+  if (track.hold) elapsed -= Math.max(0, Math.min(track.hold.durationMs, elapsed - track.hold.atMs));
   const t = elapsed < 0 ? 0 : track.durationMs <= 0 ? 1 : Math.min(1, elapsed / track.durationMs);
   if (track.kind === "shatter") {
     // The piece is replaced by its fragments at impact (see DebrisLayer).

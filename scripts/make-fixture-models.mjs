@@ -16,6 +16,13 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import sharp from 'sharp';
 import { createIO } from './models/process.mjs';
 
+if (process.argv.includes('--rigged')) {
+  const { writeRiggedFixture } = await import('./models/rigged-fixture.mjs');
+  await writeRiggedFixture('assets/models/fixtures/rigged');
+  console.log('Wrote assets/models/fixtures/rigged (idle + attack, hit at 400 ms)');
+  process.exit(0);
+}
+
 const directory = 'assets/models/fixtures';
 await mkdir(directory, { recursive: true });
 let manifest;

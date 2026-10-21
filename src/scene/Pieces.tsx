@@ -1,6 +1,7 @@
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
-import { Quaternion, Vector3, type Mesh } from "three";
+import { useEffect, useMemo, useRef } from "react";
+import { Quaternion, Vector3, type Object3D } from "three";
+import { createRigPlayback } from "./pieces/rigPlayback";
 import { sampleAttack } from "./animation/attackChoreography";
 import { ImpactShake, type ShakeImpulse } from "./camera/CameraImpactShake";
 import { DEFAULT_ANIMATION_CONFIG } from "../config/animation";
@@ -13,6 +14,19 @@ import { squareToWorld } from "./coords";
 import { FACING } from "./facing";
 import { createProceduralPieceProvider } from "./pieces/proceduralPieces";
 import type { PieceModelProvider } from "./pieces/PieceModelProvider";
+
+function RiggedVisual({ piece, models, attackTime }: { piece: PieceInstance; models: PieceModelProvider; attackTime: () => number | undefined }) {
+  const rig = models.rig!(piece.type)!;
+  const material = models.material(piece.type, piece.color);
+  const playback = useMemo(() => {
+    // Stable per-piece pseudo-random phase; render remains pure under StrictMode.
+    const seed = [...piece.id].reduce((hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619), 2166136261) >>> 0;
+    return createRigPlayback(rig, material, seed / 4294967296);
+  }, [rig, material, piece.id]);
+  useEffect(() => { playback.resume(); return () => playback.dispose(); }, [playback]);
+  useFrame((_, delta) => playback.update(delta, attackTime()), -1);
+  return <primitive object={playback.scene} dispose={null} />;
+}
 
 interface PiecesProps {
   pieces: PieceInstance[];
@@ -28,13 +42,15 @@ interface PiecesProps {
 
 export function Pieces({ pieces, activeEvent, onAnimationDone, onImpact, provider, onPieceClick }: PiecesProps) {
   const models = useMemo(() => provider ?? createProceduralPieceProvider(), [provider]);
-  const meshes = useRef(new Map<string, Mesh>());
+  const meshes = useRef(new Map<string, Object3D>());
+  const attackerType = pieces.find((piece) => piece.id === activeEvent?.pieceId)?.type;
+  const attackerRig = attackerType ? models.rig?.(attackerType) : undefined;
   const bounds = useMemo(() => modelBounds(models), [models]);
   const plan = useMemo(() => (activeEvent
-    ? planMove(activeEvent, DEFAULT_ANIMATION_CONFIG, captureContactDistance(pieces, activeEvent, bounds), pieces.find((piece) => piece.id === activeEvent.pieceId)?.type)
-    : undefined), [activeEvent, pieces, bounds]);
+    ? planMove(activeEvent, DEFAULT_ANIMATION_CONFIG, captureContactDistance(pieces, activeEvent, bounds), attackerType, attackerRig?.clips.attack ? attackerRig : undefined)
+    : undefined), [activeEvent, pieces, bounds, attackerType, attackerRig]);
   const playback = useRef<
-    { plan: NonNullable<typeof plan>; startedAt?: number; impacted: boolean; done: boolean } | undefined
+    { plan: NonNullable<typeof plan>; startedAt?: number; elapsed?: number; impacted: boolean; done: boolean } | undefined
   >(undefined);
 
   const shake = useRef<ShakeImpulse | undefined>(undefined);
@@ -65,6 +81,7 @@ export function Pieces({ pieces, activeEvent, onAnimationDone, onImpact, provide
     const now = clock.getElapsedTime() * 1000;
     current.startedAt ??= now;
     const elapsed = now - current.startedAt;
+    current.elapsed = elapsed;
 
     for (const track of plan.tracks) {
       const mesh = meshes.current.get(track.pieceId);
@@ -72,6 +89,10 @@ export function Pieces({ pieces, activeEvent, onAnimationDone, onImpact, provide
       const sample = sampleTrack(track, elapsed, DEFAULT_ANIMATION_CONFIG);
       mesh.position.set(sample.x, sample.y, sample.z);
       mesh.visible = sample.visible;
+      if (plan.skeletalAttack?.pieceId === track.pieceId && plan.impact) {
+        const [dx, dz] = plan.impact.direction;
+        mesh.rotation.set(0, -Math.atan2(dz, dx), 0);
+      }
       if (plan.attack?.pieceId === track.pieceId && plan.impact) {
         const pose = sampleAttack(plan.attack, elapsed);
         const [dx, dz] = plan.impact.direction;
@@ -106,23 +127,28 @@ export function Pieces({ pieces, activeEvent, onAnimationDone, onImpact, provide
       {pieces.map((piece) => {
         const [x, z] = squareToWorld(piece.square);
         return (
-          <mesh
+          <group
             key={piece.id}
             ref={(mesh) => {
               if (mesh) meshes.current.set(piece.id, mesh);
               else meshes.current.delete(piece.id);
             }}
-            geometry={models.geometry(piece.type)}
-            material={models.material(piece.type, piece.color)}
             position={[x, 0, z]}
             rotation={[0, FACING[piece.color], 0]}
-            castShadow
-            receiveShadow
             onClick={(event) => {
               event.stopPropagation();
               onPieceClick?.(piece.square);
             }}
-          />
+          >
+            {models.rig?.(piece.type) ? <RiggedVisual
+              piece={piece} models={models}
+              attackTime={() => {
+                const current = playback.current;
+                const attack = current?.plan.skeletalAttack;
+                return attack?.pieceId === piece.id && current?.elapsed !== undefined ? current.elapsed - attack.startMs : undefined;
+              }}
+            /> : <mesh geometry={models.geometry(piece.type)} material={models.material(piece.type, piece.color)} castShadow receiveShadow />}
+          </group>
         );
       })}
     </group>
