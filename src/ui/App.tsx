@@ -71,7 +71,7 @@ export function App() {
 
   return (
     <div className="app">
-      <ChessScene quality={quality}>
+      <ChessScene quality={quality} paused={phase === "setup"}>
         <CinematicCamera shot={shot} enabled={cinematicEnabled} onShotEnd={() => setShot(null)} />
         <Board
           selected={selected}

@@ -30,9 +30,17 @@ function DevFrameCounter() {
 }
 
 /** The chamber is decorative; board coordinates and gameplay remain unchanged. */
-export function ChessScene({ children, quality = "high" }: { children: ReactNode; quality?: GraphicsQuality }) {
+/**
+ * `paused` (e.g. behind the setup menu) renders only when something changes instead of
+ * every frame, so the menu stays responsive and the GPU idles on slow hardware.
+ */
+export function ChessScene({ children, quality = "high", paused = false }: {
+  children: ReactNode;
+  quality?: GraphicsQuality;
+  paused?: boolean;
+}) {
   return (
-    <Canvas shadows camera={{ position: [0, 9, 9.5], fov: 50 }} dpr={quality === "low" ? QUALITY_PRESETS.low.dpr : [1, QUALITY_PRESETS.high.dpr]}>
+    <Canvas frameloop={paused ? "demand" : "always"} shadows gl={{ toneMappingExposure: 0.85 }} camera={{ position: [0, 9, 9.5], fov: 50 }} dpr={quality === "low" ? QUALITY_PRESETS.low.dpr : [1, QUALITY_PRESETS.high.dpr]}>
       <Chamber quality={quality} />
 
       {children}
