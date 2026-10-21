@@ -1,0 +1,23 @@
+{
+  "pieces": {
+    "p": {
+      "rotationYDegrees": -90,
+      "rigged": {
+        "files": [
+          "pawn-*.glb"
+        ],
+        "clips": {
+          "idle": "idle",
+          "attack": "attack"
+        },
+        "hitTimeMs": null
+      }
+    }
+  },
+  "heights": {
+    "p": 0.896
+  },
+  "maxFootprint": 0.78,
+  "maxTriangles": 20000,
+  "textureSize": 64
+}

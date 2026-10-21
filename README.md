@@ -16,6 +16,11 @@ and dust. Play against Stockfish or a friend on the same computer.
 - Stockfish opponent with five difficulty levels, running in a Web Worker.
 - Realistic stone piece models, animated moves, and physics-based shattering.
 - Cinematic camera on major captures, stone sounds, last-move highlight.
+- Torchlit stone chamber, stepped dais, CC0 PBR masonry, vaulted arches, fog and dust.
+- Persistent **Graphics High / Low** selector in the settings bar. High adds ambient
+  occlusion, subtle flame bloom, filmic tone mapping and vignette; Low removes the
+  post-processing pipeline and torch shadows, and reduces lights, dust and pixel density.
+  Both retain the board's key light and cool fill. Orbit lower / zoom out to see the hall.
 - Undo, optional chess clock (5+0, 10+5, 15+10), autosave with "Continue game",
   and PGN export/import.
 
@@ -49,7 +54,10 @@ run on demand: *Actions → CI → Run workflow → scenarios*.
 - `src/core` — game rules, commands, engine, clock, PGN (no rendering code).
 - `src/scene` — the 3D board, pieces, animation, fracture, debris, camera.
 - `src/ui` — game store and screens. `src/audio` — sound playback.
-- `docs/architecture.md` — design principles and decisions D1–D12.
+- `docs/architecture.md` — design principles and decisions D1–D15.
+- `src/scene/environment` — decorative `Chamber` (`quality="high" | "low"`),
+  deterministic flicker, layout and quality presets. Reflections use local Lightformers,
+  so the chamber makes no third-party runtime requests.
 - `docs/models/generation-guide.md` — how the piece models were generated.
 
 ## License
@@ -63,6 +71,9 @@ assets and the chess engine keep their own licenses, listed below.
   (paid plan) and released under
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — credit: "Magic Chess piece
   models by Wilmer Henao, CC BY 4.0". Details: `public/models/LICENSE.md`.
+- **Environment textures:** Poly Haven **Stone Floor** (Dimitrios Savva) and
+  **Stone Wall 02** (Charlotte Baglioni / Dario Barresi), CC0. Six 1K WebP PBR maps,
+  under 1 MB total. Source URLs and conversion details: `public/environment/LICENSE.md`.
 - **Sounds:** [Kenney Impact Sounds](https://kenney.nl/assets/impact-sounds), CC0.
   Details: `public/sounds/LICENSE.md`.
 - **Chess engine:** [Stockfish](https://stockfishchess.org) via

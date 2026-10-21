@@ -9,6 +9,7 @@ import { planCinematicShot, qualifiesForCinematic, type CinematicShot } from "..
 import { CinematicToggle, readCinematicEnabled } from "../scene/camera/CinematicToggle";
 import { effectsStore } from "../scene/effects/effectsStore";
 import { ChessScene } from "../scene/ChessScene";
+import { QUALITY_KEY, readQuality, type GraphicsQuality } from "../scene/environment/chamberConfig";
 import { Pieces } from "../scene/Pieces";
 import { createProceduralPieceProvider } from "../scene/pieces/proceduralPieces";
 import { loadPieceModels } from "../scene/pieces/gltfPieces";
@@ -25,6 +26,11 @@ const DestructionLayer = lazy(() =>
 );
 
 export function App() {
+  const [quality, setQuality] = useState(readQuality);
+  useEffect(() => {
+    try { localStorage.setItem(QUALITY_KEY, quality); }
+    catch { /* Private browsing can disable storage; the session setting still works. */ }
+  }, [quality]);
   const [models, setModels] = useState(createProceduralPieceProvider);
   useEffect(() => {
     let active = true;
@@ -65,7 +71,7 @@ export function App() {
 
   return (
     <div className="app">
-      <ChessScene>
+      <ChessScene quality={quality} paused={phase === "setup"}>
         <CinematicCamera shot={shot} enabled={cinematicEnabled} onShotEnd={() => setShot(null)} />
         <Board
           selected={selected}
@@ -89,6 +95,13 @@ export function App() {
       {phase === "over" && <GameOverScreen />}
       <PromotionPicker />
       <div className="settings-bar">
+        <label className="graphics-quality">
+          Graphics{" "}
+          <select aria-label="Graphics quality" value={quality} onChange={(event) => setQuality(event.target.value as GraphicsQuality)}>
+            <option value="high">High</option>
+            <option value="low">Low</option>
+          </select>
+        </label>
         <CinematicToggle enabled={cinematicEnabled} onChange={setCinematicEnabled} />
         <MuteToggle provider={soundProvider} />
       </div>

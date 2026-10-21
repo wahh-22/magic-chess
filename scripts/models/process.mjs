@@ -4,7 +4,7 @@ import { reorder, weld } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import { BufferGeometry, BufferAttribute, Matrix4 } from 'three';
 import sharp from 'sharp';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, glob } from 'node:fs/promises';
 import { resolve, basename, join } from 'node:path';
 
 export function createIO() {
@@ -54,7 +54,7 @@ const WEBP_QUALITY = { Normal: 90, MetallicRoughness: 88 };
 
 // A bounded atlas lets differently textured input primitives share one PBR material.
 // Edge padding keeps bilinear sampling inside the correct tile at UV seams.
-async function atlasMaterials(document, materials, textureSize) {
+export async function atlasMaterials(document, materials, textureSize) {
   const grid = Math.ceil(Math.sqrt(materials.length));
   const tile = Math.floor(textureSize / grid);
   if (tile < 5) throw new Error('textureSize too small for the material atlas (need >= 5 pixels per tile)');
@@ -224,6 +224,24 @@ export async function processModels({ source, out, manifest, warn = console.warn
   const outputs = [];
   for (const [type, settings] of Object.entries(manifest.pieces)) {
     if (!['p', 'n', 'b', 'r', 'q', 'k'].includes(type)) throw new Error(`Unknown piece type: ${type}`);
+    if (settings.rigged) {
+      validateOptions({ ...manifest, height: manifest.heights[type], rotationYDegrees: settings.rotationYDegrees });
+      const patterns = settings.rigged.files;
+      if (!Array.isArray(patterns) || !patterns.length || patterns.some((p) => typeof p !== 'string' || p.includes('..') || p.startsWith('/') || !p.endsWith('.glb'))) throw new Error(`Invalid rigged files for ${type}`);
+      const files = new Set();
+      for (const pattern of patterns) for await (const file of glob(pattern, { cwd: source })) files.add(file);
+      if (!files.size) { warn(`Skipping missing rigged model: ${patterns.join(', ')}`); continue; }
+      try {
+        const { processRigged } = await import('./rigged.mjs');
+        const docs = [];
+        for (const file of [...files].sort()) docs.push(await io.read(resolve(source, file)));
+        const processed = await processRigged(docs, { ...manifest, height: manifest.heights[type], rotationYDegrees: settings.rotationYDegrees }, settings.rigged, warn);
+        await compressDocument(processed.document);
+        outputs.push({ type, binary: await io.writeBinary(processed.document), file: [...files].join(', '), before: processed.trianglesBefore, after: processed.entry.triangles });
+        result.pieces[type] = { file: `${type}.glb`, ...processed.entry };
+      } catch (error) { throw new Error(`Failed to process rigged ${type}: ${error.message}`, { cause: error }); }
+      continue;
+    }
     if (basename(settings.file) !== settings.file || !settings.file.endsWith('.glb')) throw new Error(`Invalid source filename: ${settings.file}`);
     const file = resolve(source, settings.file);
     let bytes;

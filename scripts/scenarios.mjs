@@ -82,15 +82,24 @@ function assertPiece(s, id, square, type) {
   assert.equal(piece.type, type, `${id} type`);
 }
 
+/** Selects a radio and waits until React has applied it (the update may lag a busy frame). */
+async function choose(radio) {
+  await radio.click();
+  await radio.page().waitForFunction((el) => el.checked, await radio.elementHandle(), { timeout: 15000 });
+}
+
 async function start(ai = false, timed = false) {
   // Clear only this app's autosave, then reset the store, worker and frames.
   if (page.url() === "about:blank") await page.goto(url);
   await page.evaluate((key) => localStorage.removeItem(key), saveKey);
   await page.reload();
   await page.waitForFunction(() => globalThis.__gameStore?.getState().phase === "setup");
-  await page.getByLabel(ai ? "Play vs the engine" : "Two players on this computer", { exact: true }).check();
+  // Like a player, interact once the scene has drawn: the first frame compiles shaders and
+  // uploads textures, which blocks the main thread for seconds under software rendering.
+  await page.waitForFunction(() => (globalThis.__frames ?? 0) >= 1, undefined, { timeout: 60000 });
+  await choose(page.getByLabel(ai ? "Play vs the engine" : "Two players on this computer", { exact: true }));
   if (ai) {
-    await page.getByLabel("White", { exact: true }).check();
+    await choose(page.getByLabel("White", { exact: true }));
     await page.getByLabel("Difficulty", { exact: true }).selectOption({ label: "Beginner" });
   }
   if (timed) await page.getByLabel("Time control", { exact: true }).selectOption("5+0");

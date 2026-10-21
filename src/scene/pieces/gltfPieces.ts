@@ -1,9 +1,9 @@
-import { Mesh, MeshStandardMaterial, Vector3 } from "three";
-import type { BufferGeometry, Group } from "three";
+import { Mesh, MeshStandardMaterial, SkinnedMesh, Vector3 } from "three";
+import type { AnimationClip, BufferGeometry, Group } from "three";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { Color, PieceType } from "../../core/types";
-import type { PieceModelProvider } from "./PieceModelProvider";
+import type { PieceModelProvider, PieceRig } from "./PieceModelProvider";
 import { createProceduralPieceProvider } from "./proceduralPieces";
 
 const TYPES: PieceType[] = ["p", "n", "b", "r", "q", "k"];
@@ -16,6 +16,10 @@ export interface ModelEntry {
   footprint: number;
   triangles: number;
   fragmentColor: string;
+  skinned?: true;
+  clips?: { idle?: string; attack?: string };
+  hitTimeMs?: number;
+  clipDurationMs?: number;
 }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -33,9 +37,14 @@ export function parseManifest(value: unknown): Partial<Record<PieceType, ModelEn
       typeof entry.footprint !== "number" || !Number.isFinite(entry.footprint) || entry.footprint <= 0 || entry.footprint > 1 ||
       typeof entry.triangles !== "number" || !Number.isInteger(entry.triangles) || entry.triangles <= 0 ||
       typeof entry.fragmentColor !== "string" || !/^#[0-9a-f]{6}$/i.test(entry.fragmentColor)) continue;
+    if (entry.skinned === true && (!record(entry.clips) ||
+      Object.values(entry.clips).some((name) => typeof name !== "string") ||
+      typeof entry.hitTimeMs !== "number" || !Number.isFinite(entry.hitTimeMs) || entry.hitTimeMs < 0 ||
+      typeof entry.clipDurationMs !== "number" || !Number.isFinite(entry.clipDurationMs) || entry.clipDurationMs < entry.hitTimeMs)) continue;
     pieces[type] = {
       file: entry.file, height: entry.height, footprint: entry.footprint,
       triangles: entry.triangles, fragmentColor: entry.fragmentColor,
+      ...(entry.skinned === true ? { skinned: true, clips: entry.clips as ModelEntry["clips"], hitTimeMs: entry.hitTimeMs as number, clipDurationMs: entry.clipDurationMs as number } : {}),
     };
   }
   return pieces;
@@ -59,7 +68,7 @@ export function validateGeometry(geometry: BufferGeometry, entry: ModelEntry): b
 
 interface LoadOptions {
   fetch?: (url: string) => Promise<Pick<Response, "ok" | "json">>;
-  load?: (url: string) => Promise<{ scene: Group }>;
+  load?: (url: string) => Promise<{ scene: Group; animations?: AnimationClip[] }>; 
   fallback?: PieceModelProvider;
   warn?: (message: string, error: unknown) => void;
 }
@@ -83,6 +92,7 @@ export async function loadPieceModels({
     geometry: BufferGeometry;
     materials: Record<Color, MeshStandardMaterial>;
     fragments: Record<Color, MeshStandardMaterial>;
+    rig?: PieceRig;
   }>();
   try {
     // Vite's HTML fallback gives a quiet 200 when optional public assets are absent;
@@ -94,23 +104,41 @@ export async function loadPieceModels({
       const entry = entries[type];
       if (!entry) return;
       try {
-        const { scene } = await load(`/models/${entry.file}`);
+        const { scene, animations = [] } = await load(`/models/${entry.file}`);
         const meshes: Mesh[] = [];
         scene.traverse((object) => { if (object instanceof Mesh) meshes.push(object); });
         const mesh = meshes[0];
         if (meshes.length !== 1 || !mesh || !(mesh.material instanceof MeshStandardMaterial) ||
-          mesh.geometry.groups.length > 1 || mesh.morphTargetInfluences?.length || "isSkinnedMesh" in mesh) {
+          mesh.geometry.groups.length > 1 || mesh.morphTargetInfluences?.length || (mesh instanceof SkinnedMesh) !== !!entry.skinned) {
           throw new Error("Expected one static mesh primitive with one PBR material");
         }
         scene.updateMatrixWorld(true);
         // Reject transforms that would make the mesh's local geometry differ from its visible frame.
         const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-        if (mesh.matrixWorld.elements.some((value, i) => Math.abs(value - identity[i]!) > 1e-6) ||
-          !validateGeometry(mesh.geometry, entry)) throw new Error("Geometry violates normalized model bounds");
+        let geometry = mesh.geometry;
+        let rig: PieceRig | undefined;
+        if (mesh instanceof SkinnedMesh) {
+          // CPU skin once in the exported bind pose, in normalized world space.
+          geometry = mesh.geometry.clone();
+          const positions = geometry.getAttribute("position");
+          const vertex = new Vector3();
+          for (let i = 0; i < positions.count; i++) {
+            mesh.getVertexPosition(i, vertex).applyMatrix4(mesh.matrixWorld);
+            positions.setXYZ(i, vertex.x, vertex.y, vertex.z);
+          }
+          geometry.deleteAttribute("skinIndex"); geometry.deleteAttribute("skinWeight");
+          geometry.computeVertexNormals();
+          const find = (name?: string) => animations.find((clip) => clip.name === name);
+          const idle = find(entry.clips?.idle), attack = find(entry.clips?.attack);
+          if ((entry.clips?.idle && !idle) || (entry.clips?.attack && !attack)) throw new Error("Rig is missing a declared animation clip");
+          if (attack && Math.abs(attack.duration * 1000 - entry.clipDurationMs!) > 2) throw new Error("Attack duration differs from manifest");
+          rig = { scene, clips: { idle, attack }, hitTimeMs: entry.hitTimeMs!, clipDurationMs: entry.clipDurationMs! };
+        } else if (mesh.matrixWorld.elements.some((value, i) => Math.abs(value - identity[i]!) > 1e-6)) throw new Error("Static mesh has unbaked transforms");
+        if (!validateGeometry(geometry, entry)) throw new Error("Geometry violates normalized model bounds");
         const light = mesh.material;
         const fragment = new MeshStandardMaterial({ color: entry.fragmentColor, roughness: light.roughness, metalness: 0 });
         loaded.set(type, {
-          geometry: mesh.geometry,
+          geometry, rig,
           materials: { w: light, b: tinted(light) },
           fragments: { w: fragment, b: tinted(fragment) },
         });
@@ -125,6 +153,7 @@ export async function loadPieceModels({
   if (!loaded.size) return fallback;
   return {
     geometry: (type) => loaded.get(type)?.geometry ?? fallback.geometry(type),
+    rig: (type) => loaded.get(type)?.rig ?? fallback.rig?.(type),
     material: (type, color) => loaded.get(type)?.materials[color] ?? fallback.material(type, color),
     fragmentMaterial: (type, color) => loaded.get(type)?.fragments[color] ?? fallback.fragmentMaterial(type, color),
   };

@@ -237,6 +237,21 @@ body,
   background: transparent;
 }
 
+.graphics-quality select {
+  padding: 4px 8px;
+  border: 1px solid #73664f;
+  border-radius: 4px;
+  background: #302d32;
+  color: #e8e2d6;
+  font: inherit;
+  cursor: pointer;
+}
+
+.graphics-quality select:focus-visible {
+  outline: 2px solid #e3c77e;
+  outline-offset: 2px;
+}
+
 .settings-bar {
   position: fixed;
   top: 16px;

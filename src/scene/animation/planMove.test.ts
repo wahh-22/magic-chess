@@ -15,6 +15,22 @@ function move(overrides: Partial<MoveEvent> = {}): MoveEvent {
 const config = DEFAULT_ANIMATION_CONFIG;
 
 describe("planMove", () => {
+  it("holds a skeletal attacker at first contact and uses arrival plus clip hit time", () => {
+    const event = move({ to: "d3", captured: { pieceId: "victim", square: "d3" } });
+    const rig = { hitTimeMs: 400, clipDurationMs: 1000 };
+    const plan = planMove(event, config, 0.6, "p", rig);
+    expect(plan.attack).toBeUndefined();
+    expect(plan.skeletalAttack).toBeDefined();
+    const arrival = plan.skeletalAttack!.startMs;
+    expect(plan.impact!.atMs).toBeCloseTo(arrival + 400);
+    expect(plan.impact!.atMs).toBeLessThanOrEqual(arrival + 1000);
+    const before = sampleTrack(plan.tracks[0]!, arrival, config);
+    const during = sampleTrack(plan.tracks[0]!, arrival + 500, config);
+    expect(during).toEqual(before);
+    expect(plan.tracks[1]!.startMs).toBe(plan.impact!.atMs);
+    expect(planMove(move(), config, 0.6, "p", rig)).toEqual(planMove(move(), config, 0.6, "p"));
+    expect(planMove(event, config, 0.6, "p").attack).toBeDefined();
+  });
   it("plans a quiet pawn glide using distance and includes the post-move pause", () => {
     const plan = planMove(move());
     expect(plan.tracks).toEqual([{
@@ -53,7 +69,7 @@ describe("planMove", () => {
       pieceId: "victim", kind: "shatter", startMs: arrival - 75, durationMs: 0,
       from: squareToWorld(square), to: squareToWorld(square),
     });
-    expect(plan.durationMs).toBeCloseTo(arrival + 33);
+    expect(plan.durationMs).toBeCloseTo(Math.max(arrival, plan.attack!.endMs) + 33);
   });
 
   it("describes the impact with the victim position and the unit attack direction", () => {
