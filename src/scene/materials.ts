@@ -51,9 +51,3 @@ export const fragmentMaterials: Record<Color, MeshStandardMaterial> = {
   w: new MeshStandardMaterial({ color: "#e9e2d2", roughness: 0.55 }),
   b: new MeshStandardMaterial({ color: "#34343a", roughness: 0.45 }),
 };
-
-export const boardMaterials = {
-  light: stone("#d6cdb9", 0.5, 37),
-  dark: stone("#3b3530", 0.5, 41),
-  frame: stone("#4a3b2e", 0.65, 53),
-};

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CAMERA_KEEP_OUT, DAIS, parseQuality, PILLARS, PILLAR_HALF_WIDTH, QUALITY_PRESETS, torchFlicker, WALL_DISTANCE } from "./chamberConfig";
+import { CAMERA_KEEP_OUT, DAIS, parseQuality, PILLARS, PILLAR_RADIUS, PILLAR_HALF_WIDTH, QUALITY_PRESETS, torchFlicker, WALL_DISTANCE } from "./chamberConfig";
 
 describe("chamber presentation contract", () => {
   it("flickers deterministically, smoothly and within its energy budget", () => {
@@ -30,7 +30,7 @@ describe("chamber presentation contract", () => {
     for (const { x, z } of PILLARS) {
       expect(Math.hypot(x, z) - PILLAR_HALF_WIDTH - 1.2).toBeGreaterThan(CAMERA_KEEP_OUT);
     }
-    expect(22 * Math.cos(Math.PI / 12) - PILLAR_HALF_WIDTH).toBeGreaterThan(CAMERA_KEEP_OUT);
+    expect(PILLAR_RADIUS * Math.cos(Math.PI / 12) - PILLAR_HALF_WIDTH).toBeGreaterThan(CAMERA_KEEP_OUT);
     expect(WALL_DISTANCE - 0.5).toBeGreaterThan(CAMERA_KEEP_OUT);
   });
   it("places ascending steps below the unchanged board frame", () => {

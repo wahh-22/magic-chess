@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import { AdditiveBlending, BoxGeometry, CanvasTexture, CylinderGeometry, Matrix4, MeshStandardMaterial, RepeatWrapping, SRGBColorSpace, TorusGeometry, type BufferGeometry, type Group, type PointLight, type Points } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { CAMERA_KEEP_OUT, DAIS, PILLARS, QUALITY_PRESETS, torchFlicker, WALL_DISTANCE, type GraphicsQuality } from "./chamberConfig";
+import { CAMERA_KEEP_OUT, DAIS, PILLARS, PILLAR_RADIUS, QUALITY_PRESETS, torchFlicker, WALL_DISTANCE, type GraphicsQuality } from "./chamberConfig";
 
 function useStone(asset: string, repeatX: number, repeatY: number) {
   const maps = useTexture([
@@ -45,7 +45,7 @@ function buildMasonry() {
   const blocks: BufferGeometry[] = [];
   const add = (geometry: BufferGeometry, matrix: Matrix4) => { blocks.push(geometry.applyMatrix4(matrix)); };
   const translate = (x: number, y: number, z: number) => new Matrix4().makeTranslation(x, y, z);
-  const chord = 44 * Math.sin(Math.PI / 12);
+  const chord = 2 * PILLAR_RADIUS * Math.sin(Math.PI / 12);
   PILLARS.forEach(({ x, z, angle }, index) => {
     const base = translate(x, -1.35, z).multiply(new Matrix4().makeRotationY(angle));
     add(new BoxGeometry(1.8, 0.8, 1.8), base.clone().multiply(translate(0, 0.4, 0)));
@@ -62,7 +62,7 @@ function buildMasonry() {
     }
   });
   for (let index = 0; index < 6; index++) {
-    add(new TorusGeometry(21.2, 0.23, 5, 40, Math.PI), translate(0, 13.5, 0).multiply(new Matrix4().makeRotationY(index * Math.PI / 6)));
+    add(new TorusGeometry(PILLAR_RADIUS - 0.8, 0.23, 5, 40, Math.PI), translate(0, 13.5, 0).multiply(new Matrix4().makeRotationY(index * Math.PI / 6)));
   }
   const merged = mergeGeometries(blocks)!;
   blocks.forEach((geometry) => geometry.dispose());
@@ -89,10 +89,10 @@ function StoneHall() {
       {[0, 1, 2, 3].map((side) => (
         <group key={side} rotation-y={side * Math.PI / 2}>
           <mesh position={[0, 5.5, -WALL_DISTANCE]} material={wall} receiveShadow>
-            <boxGeometry args={[53, 14, 0.8]} />
+            <boxGeometry args={[WALL_DISTANCE * 2 + 1, 14, 0.8]} />
           </mesh>
           <mesh position={[0, -0.65, -WALL_DISTANCE + 0.5]} material={pillar}>
-            <boxGeometry args={[53, 1.3, 0.6]} />
+            <boxGeometry args={[WALL_DISTANCE * 2 + 1, 1.3, 0.6]} />
           </mesh>
         </group>
       ))}

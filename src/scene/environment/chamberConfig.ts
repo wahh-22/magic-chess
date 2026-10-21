@@ -24,9 +24,10 @@ export function torchFlicker(seconds: number, seed: number): number {
 
 // Entire orbit (maxDistance 18), not just the initial camera, is kept clear.
 export const CAMERA_KEEP_OUT = 18;
-export const PILLAR_RADIUS = 22;
+// Rear plinths clear the top edge of the default camera, without reducing the hall.
+export const PILLAR_RADIUS = 28;
 export const PILLAR_HALF_WIDTH = 0.9;
-export const WALL_DISTANCE = 26;
+export const WALL_DISTANCE = 29;
 export const PILLARS = Array.from({ length: 12 }, (_, index) => {
   const angle = index * Math.PI / 6;
   return { x: Math.sin(angle) * PILLAR_RADIUS, z: Math.cos(angle) * PILLAR_RADIUS, angle };
