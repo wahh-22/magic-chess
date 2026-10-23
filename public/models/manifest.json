@@ -2,46 +2,629 @@
   "version": 1,
   "pieces": {
     "p": {
-      "file": "p.glb",
-      "height": 0.8959999680519104,
-      "footprint": 0.4888644814491272,
-      "triangles": 20000,
-      "fragmentColor": "#817d77"
+      "colors": {
+        "w": {
+          "file": "p-w.glb",
+          "skinned": true,
+          "clips": {
+            "idle": "idle",
+            "walk": "walk",
+            "hit": "hit",
+            "attack0": "attack0",
+            "attack1": "attack1",
+            "attack": "attack0"
+          },
+          "rig": {
+            "clips": {
+              "idle": "idle",
+              "walk": "walk",
+              "hit": "hit",
+              "attack0": "attack0",
+              "attack1": "attack1",
+              "attack": "attack0"
+            },
+            "attacks": [
+              {
+                "clip": "attack0",
+                "durationMs": 1900,
+                "hitMs": 912,
+                "activeEndMs": 1083,
+                "trailStartMs": 760,
+                "trailEndMs": 1083
+              },
+              {
+                "clip": "attack1",
+                "durationMs": 2000,
+                "hitMs": 960,
+                "activeEndMs": 1140,
+                "trailStartMs": 800,
+                "trailEndMs": 1140
+              }
+            ],
+            "walkCycle": {
+              "durationMs": 1200,
+              "strideBoardUnits": 0.2464497518166435
+            },
+            "weaponTip": "weapon_tip.R"
+          },
+          "hitTimeMs": 912,
+          "clipDurationMs": 1899.999976158142,
+          "height": 0.8,
+          "footprint": 0.48500042236218033,
+          "triangles": 29904,
+          "fragmentColor": "#5e665b"
+        },
+        "b": {
+          "file": "p-b.glb",
+          "skinned": true,
+          "clips": {
+            "idle": "idle",
+            "walk": "walk",
+            "hit": "hit",
+            "attack0": "attack0",
+            "attack1": "attack1",
+            "attack": "attack0"
+          },
+          "rig": {
+            "clips": {
+              "idle": "idle",
+              "walk": "walk",
+              "hit": "hit",
+              "attack0": "attack0",
+              "attack1": "attack1",
+              "attack": "attack0"
+            },
+            "attacks": [
+              {
+                "clip": "attack0",
+                "durationMs": 1900,
+                "hitMs": 912,
+                "activeEndMs": 1083,
+                "trailStartMs": 760,
+                "trailEndMs": 1083
+              },
+              {
+                "clip": "attack1",
+                "durationMs": 2000,
+                "hitMs": 960,
+                "activeEndMs": 1140,
+                "trailStartMs": 800,
+                "trailEndMs": 1140
+              }
+            ],
+            "walkCycle": {
+              "durationMs": 1200,
+              "strideBoardUnits": 0.2464497518166435
+            },
+            "weaponTip": "weapon_tip.R"
+          },
+          "hitTimeMs": 912,
+          "clipDurationMs": 1899.999976158142,
+          "height": 0.8,
+          "footprint": 0.48500042236218033,
+          "triangles": 29904,
+          "fragmentColor": "#432119"
+        }
+      }
     },
     "n": {
-      "file": "n.glb",
-      "height": 1.1200000047683716,
-      "footprint": 0.5533502101898193,
-      "triangles": 19994,
-      "fragmentColor": "#827e79"
+      "colors": {
+        "w": {
+          "file": "n-w.glb",
+          "skinned": true,
+          "clips": {
+            "idle": "idle",
+            "hit": "hit",
+            "attack0": "attack0",
+            "attack1": "attack1",
+            "attack": "attack0"
+          },
+          "rig": {
+            "clips": {
+              "idle": "idle",
+              "hit": "hit",
+              "attack0": "attack0",
+              "attack1": "attack1",
+              "attack": "attack0"
+            },
+            "attacks": [
+              {
+                "clip": "attack0",
+                "durationMs": 2150,
+                "hitMs": 760,
+                "activeEndMs": 890,
+                "trailStartMs": 480,
+                "trailEndMs": 890
+              },
+              {
+                "clip": "attack1",
+                "durationMs": 2500,
+                "hitMs": 920,
+                "activeEndMs": 1070,
+                "trailStartMs": 600,
+                "trailEndMs": 1070
+              }
+            ],
+            "weaponTip": "rider_weapon_tip_R"
+          },
+          "hitTimeMs": 760,
+          "clipDurationMs": 2150.0000953674316,
+          "height": 0.9399999999999998,
+          "footprint": 0.7101326856230796,
+          "triangles": 39951,
+          "fragmentColor": "#3c4139"
+        },
+        "b": {
+          "file": "n-b.glb",
+          "skinned": true,
+          "clips": {
+            "idle": "idle",
+            "hit": "hit",
+            "attack0": "attack0",
+            "attack1": "attack1",
+            "attack": "attack0"
+          },
+          "rig": {
+            "clips": {
+              "idle": "idle",
+              "hit": "hit",
+              "attack0": "attack0",
+              "attack1": "attack1",
+              "attack": "attack0"
+            },
+            "attacks": [
+              {
+                "clip": "attack0",
+                "durationMs": 2150,
+                "hitMs": 760,
+                "activeEndMs": 890,
+                "trailStartMs": 480,
+                "trailEndMs": 890
+              },
+              {
+                "clip": "attack1",
+                "durationMs": 2500,
+                "hitMs": 920,
+                "activeEndMs": 1070,
+                "trailStartMs": 600,
+                "trailEndMs": 1070
+              }
+            ],
+            "weaponTip": "rider_weapon_tip_R"
+          },
+          "hitTimeMs": 760,
+          "clipDurationMs": 2150.0000953674316,
+          "height": 0.9399999999999998,
+          "footprint": 0.7101326856230796,
+          "triangles": 39951,
+          "fragmentColor": "#2c1510"
+        }
+      }
     },
     "b": {
-      "file": "b.glb",
-      "height": 1.2879999876022339,
-      "footprint": 0.3829365074634552,
-      "triangles": 19998,
-      "fragmentColor": "#8a8781"
+      "colors": {
+        "w": {
+          "file": "b-w.glb",
+          "skinned": true,
+          "clips": {
+            "idle": "idle",
+            "walk": "walk",
+            "hit": "hit",
+            "attack0": "attack0",
+            "attack1": "attack1",
+            "attack": "attack0"
+          },
+          "rig": {
+            "clips": {
+              "idle": "idle",
+              "walk": "walk",
+              "hit": "hit",
+              "attack0": "attack0",
+              "attack1": "attack1",
+              "attack": "attack0"
+            },
+            "attacks": [
+              {
+                "clip": "attack0",
+                "durationMs": 1820,
+                "hitMs": 873.6,
+                "activeEndMs": 1037.4,
+                "trailStartMs": 728,
+                "trailEndMs": 1037.4
+              },
+              {
+                "clip": "attack1",
+                "durationMs": 1960,
+                "hitMs": 940.8,
+                "activeEndMs": 1117.2,
+                "trailStartMs": 784,
+                "trailEndMs": 1117.2
+              }
+            ],
+            "walkCycle": {
+              "durationMs": 1200,
+              "strideBoardUnits": 0.33398873686191805
+            },
+            "weaponTip": "weapon_tip.R"
+          },
+          "hitTimeMs": 873.6,
+          "clipDurationMs": 1820.0000524520874,
+          "height": 1.08,
+          "footprint": 0.6539445431483062,
+          "triangles": 29900,
+          "fragmentColor": "#5e665b"
+        },
+        "b": {
+          "file": "b-b.glb",
+          "skinned": true,
+          "clips": {
+            "idle": "idle",
+            "walk": "walk",
+            "hit": "hit",
+            "attack0": "attack0",
+            "attack1": "attack1",
+            "attack": "attack0"
+          },
+          "rig": {
+            "clips": {
+              "idle": "idle",
+              "walk": "walk",
+              "hit": "hit",
+              "attack0": "attack0",
+              "attack1": "attack1",
+              "attack": "attack0"
+            },
+            "attacks": [
+              {
+                "clip": "attack0",
+                "durationMs": 1820,
+                "hitMs": 873.6,
+                "activeEndMs": 1037.4,
+                "trailStartMs": 728,
+                "trailEndMs": 1037.4
+              },
+              {
+                "clip": "attack1",
+                "durationMs": 1960,
+                "hitMs": 940.8,
+                "activeEndMs": 1117.2,
+                "trailStartMs": 784,
+                "trailEndMs": 1117.2
+              }
+            ],
+            "walkCycle": {
+              "durationMs": 1200,
+              "strideBoardUnits": 0.33398873686191805
+            },
+            "weaponTip": "weapon_tip.R"
+          },
+          "hitTimeMs": 873.6,
+          "clipDurationMs": 1820.0000524520874,
+          "height": 1.08,
+          "footprint": 0.6539445431483062,
+          "triangles": 29900,
+          "fragmentColor": "#432119"
+        }
+      }
     },
     "r": {
-      "file": "r.glb",
-      "height": 1.0080000162124634,
-      "footprint": 0.4900555908679962,
-      "triangles": 20000,
-      "fragmentColor": "#83807a"
+      "colors": {
+        "w": {
+          "file": "r-w.glb",
+          "skinned": true,
+          "clips": {
+            "idle": "idle",
+            "walk": "walk",
+            "hit": "hit",
+            "attack0": "attack0",
+            "attack1": "attack1",
+            "attack": "attack0"
+          },
+          "rig": {
+            "clips": {
+              "idle": "idle",
+              "walk": "walk",
+              "hit": "hit",
+              "attack0": "attack0",
+              "attack1": "attack1",
+              "attack": "attack0"
+            },
+            "attacks": [
+              {
+                "clip": "attack0",
+                "durationMs": 2100,
+                "hitMs": 1008,
+                "activeEndMs": 1197,
+                "trailStartMs": 840,
+                "trailEndMs": 1197
+              },
+              {
+                "clip": "attack1",
+                "durationMs": 1960,
+                "hitMs": 940.8,
+                "activeEndMs": 1117.2,
+                "trailStartMs": 784,
+                "trailEndMs": 1117.2
+              }
+            ],
+            "walkCycle": {
+              "durationMs": 1520,
+              "strideBoardUnits": 0.25690441461272007
+            },
+            "weaponTip": "weapon_tip_R"
+          },
+          "hitTimeMs": 1008,
+          "clipDurationMs": 2099.9999046325684,
+          "height": 1,
+          "footprint": 0.6313527538832513,
+          "triangles": 29897,
+          "fragmentColor": "#5c6357"
+        },
+        "b": {
+          "file": "r-b.glb",
+          "skinned": true,
+          "clips": {
+            "idle": "idle",
+            "walk": "walk",
+            "hit": "hit",
+            "attack0": "attack0",
+            "attack1": "attack1",
+            "attack": "attack0"
+          },
+          "rig": {
+            "clips": {
+              "idle": "idle",
+              "walk": "walk",
+              "hit": "hit",
+              "attack0": "attack0",
+              "attack1": "attack1",
+              "attack": "attack0"
+            },
+            "attacks": [
+              {
+                "clip": "attack0",
+                "durationMs": 2100,
+                "hitMs": 1008,
+                "activeEndMs": 1197,
+                "trailStartMs": 840,
+                "trailEndMs": 1197
+              },
+              {
+                "clip": "attack1",
+                "durationMs": 1960,
+                "hitMs": 940.8,
+                "activeEndMs": 1117.2,
+                "trailStartMs": 784,
+                "trailEndMs": 1117.2
+              }
+            ],
+            "walkCycle": {
+              "durationMs": 1520,
+              "strideBoardUnits": 0.25690441461272007
+            },
+            "weaponTip": "weapon_tip_R"
+          },
+          "hitTimeMs": 1008,
+          "clipDurationMs": 2099.9999046325684,
+          "height": 1,
+          "footprint": 0.6313527538832513,
+          "triangles": 29897,
+          "fragmentColor": "#3d1f18"
+        }
+      }
     },
     "q": {
-      "file": "q.glb",
-      "height": 1.4559999704360962,
-      "footprint": 0.5925605893135071,
-      "triangles": 19974,
-      "fragmentColor": "#8a8780"
+      "colors": {
+        "w": {
+          "file": "q-w.glb",
+          "skinned": true,
+          "clips": {
+            "idle": "idle",
+            "walk": "walk",
+            "hit": "hit",
+            "attack0": "attack0",
+            "attack1": "attack1",
+            "attack": "attack0"
+          },
+          "rig": {
+            "clips": {
+              "idle": "idle",
+              "walk": "walk",
+              "hit": "hit",
+              "attack0": "attack0",
+              "attack1": "attack1",
+              "attack": "attack0"
+            },
+            "attacks": [
+              {
+                "clip": "attack0",
+                "durationMs": 2050,
+                "hitMs": 984,
+                "activeEndMs": 1168.5,
+                "trailStartMs": 820,
+                "trailEndMs": 1168.5
+              },
+              {
+                "clip": "attack1",
+                "durationMs": 2900,
+                "hitMs": 1653,
+                "activeEndMs": 2001,
+                "trailStartMs": 1160,
+                "trailEndMs": 2001
+              }
+            ],
+            "walkCycle": {
+              "durationMs": 1200,
+              "strideBoardUnits": 0.37756558039134175
+            },
+            "weaponTip": "weapon_tip.L"
+          },
+          "hitTimeMs": 984,
+          "clipDurationMs": 2049.999952316284,
+          "height": 1.1599999999999997,
+          "footprint": 0.6985917079227495,
+          "triangles": 29895,
+          "fragmentColor": "#515a50"
+        },
+        "b": {
+          "file": "q-b.glb",
+          "skinned": true,
+          "clips": {
+            "idle": "idle",
+            "walk": "walk",
+            "hit": "hit",
+            "attack0": "attack0",
+            "attack1": "attack1",
+            "attack": "attack0"
+          },
+          "rig": {
+            "clips": {
+              "idle": "idle",
+              "walk": "walk",
+              "hit": "hit",
+              "attack0": "attack0",
+              "attack1": "attack1",
+              "attack": "attack0"
+            },
+            "attacks": [
+              {
+                "clip": "attack0",
+                "durationMs": 2050,
+                "hitMs": 984,
+                "activeEndMs": 1168.5,
+                "trailStartMs": 820,
+                "trailEndMs": 1168.5
+              },
+              {
+                "clip": "attack1",
+                "durationMs": 2900,
+                "hitMs": 1653,
+                "activeEndMs": 2001,
+                "trailStartMs": 1160,
+                "trailEndMs": 2001
+              }
+            ],
+            "walkCycle": {
+              "durationMs": 1200,
+              "strideBoardUnits": 0.37756558039134175
+            },
+            "weaponTip": "weapon_tip.L"
+          },
+          "hitTimeMs": 984,
+          "clipDurationMs": 2049.999952316284,
+          "height": 1.1599999999999997,
+          "footprint": 0.6985917079227495,
+          "triangles": 29895,
+          "fragmentColor": "#3d1c16"
+        }
+      }
     },
     "k": {
-      "file": "k.glb",
-      "height": 1.624000072479248,
-      "footprint": 0.5666248202323914,
-      "triangles": 19998,
-      "fragmentColor": "#8f8a85"
+      "colors": {
+        "w": {
+          "file": "k-w.glb",
+          "skinned": true,
+          "clips": {
+            "idle": "idle",
+            "walk": "walk",
+            "hit": "hit",
+            "attack0": "attack0",
+            "attack1": "attack1",
+            "attack": "attack0"
+          },
+          "rig": {
+            "clips": {
+              "idle": "idle",
+              "walk": "walk",
+              "hit": "hit",
+              "attack0": "attack0",
+              "attack1": "attack1",
+              "attack": "attack0"
+            },
+            "attacks": [
+              {
+                "clip": "attack0",
+                "durationMs": 1800,
+                "hitMs": 864,
+                "activeEndMs": 1026,
+                "trailStartMs": 720,
+                "trailEndMs": 1026
+              },
+              {
+                "clip": "attack1",
+                "durationMs": 1780,
+                "hitMs": 854.4000000000001,
+                "activeEndMs": 1014.5999999999999,
+                "trailStartMs": 712,
+                "trailEndMs": 1014.5999999999999
+              }
+            ],
+            "walkCycle": {
+              "durationMs": 1200,
+              "strideBoardUnits": 0.4307296899936888
+            },
+            "weaponTip": "weapon_tip.R"
+          },
+          "hitTimeMs": 864,
+          "clipDurationMs": 1799.9999523162842,
+          "height": 1.2400000000000004,
+          "footprint": 0.8123322124670866,
+          "triangles": 29902,
+          "fragmentColor": "#515a50"
+        },
+        "b": {
+          "file": "k-b.glb",
+          "skinned": true,
+          "clips": {
+            "idle": "idle",
+            "walk": "walk",
+            "hit": "hit",
+            "attack0": "attack0",
+            "attack1": "attack1",
+            "attack": "attack0"
+          },
+          "rig": {
+            "clips": {
+              "idle": "idle",
+              "walk": "walk",
+              "hit": "hit",
+              "attack0": "attack0",
+              "attack1": "attack1",
+              "attack": "attack0"
+            },
+            "attacks": [
+              {
+                "clip": "attack0",
+                "durationMs": 1800,
+                "hitMs": 864,
+                "activeEndMs": 1026,
+                "trailStartMs": 720,
+                "trailEndMs": 1026
+              },
+              {
+                "clip": "attack1",
+                "durationMs": 1780,
+                "hitMs": 854.4000000000001,
+                "activeEndMs": 1014.5999999999999,
+                "trailStartMs": 712,
+                "trailEndMs": 1014.5999999999999
+              }
+            ],
+            "walkCycle": {
+              "durationMs": 1200,
+              "strideBoardUnits": 0.4307296899936888
+            },
+            "weaponTip": "weapon_tip.R"
+          },
+          "hitTimeMs": 864,
+          "clipDurationMs": 1799.9999523162842,
+          "height": 1.2400000000000004,
+          "footprint": 0.8123322124670866,
+          "triangles": 29902,
+          "fragmentColor": "#3d1c16"
+        }
+      }
     }
-  }
+  },
+  "materialLibrary": "arcana-materials.glb"
 }

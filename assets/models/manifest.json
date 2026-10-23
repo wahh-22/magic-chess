@@ -1,39 +1,14 @@
 {
   "pieces": {
-    "p": {
-      "file": "pawn.glb",
-      "rotationYDegrees": 0
-    },
-    "n": {
-      "file": "knight.glb",
-      "rotationYDegrees": 0
-    },
-    "b": {
-      "file": "bishop.glb",
-      "rotationYDegrees": 0
-    },
-    "r": {
-      "file": "rook.glb",
-      "rotationYDegrees": 0
-    },
-    "q": {
-      "file": "queen.glb",
-      "rotationYDegrees": 0
-    },
-    "k": {
-      "file": "king.glb",
-      "rotationYDegrees": 0
-    }
+    "p": { "rotationYDegrees": 90, "rigged": { "arcana": "peon", "files": { "w": ["arcana-v678/V7_Peon_marfil/ARCANA_V7_peon_marfil.glb"], "b": ["arcana-v678/V7_Peon_obsidiana/ARCANA_V7_peon_obsidiana.glb"] }, "materials": "shared" } },
+    "n": { "rotationYDegrees": 90, "rigged": { "arcana": "caballo", "files": { "w": ["arcana-v678/V8_Caballo_marfil/ARCANA_V8_caballo_marfil.glb"], "b": ["arcana-v678/V8_Caballo_obsidiana/ARCANA_V8_caballo_obsidiana.glb"] }, "materials": "shared", "maxTriangles": 36500 } },
+    "b": { "rotationYDegrees": 90, "rigged": { "arcana": "alfil", "files": { "w": ["arcana-v678/V7_Alfil_marfil/ARCANA_V7_alfil_marfil.glb"], "b": ["arcana-v678/V7_Alfil_obsidiana/ARCANA_V7_alfil_obsidiana.glb"] }, "materials": "shared" } },
+    "r": { "rotationYDegrees": 90, "rigged": { "arcana": "torre", "files": { "w": ["arcana-v678/V6_Torre_dos_bandos/ARCANA_V6_torre_marfil.glb"], "b": ["arcana-v678/V6_Torre_dos_bandos/ARCANA_V6_torre_obsidiana.glb"] }, "materials": "shared" } },
+    "q": { "rotationYDegrees": 90, "rigged": { "arcana": "reina", "files": { "w": ["arcana-v678/V6_Reina_dos_bandos/ARCANA_V6_reina_marfil.glb"], "b": ["arcana-v678/V6_Reina_dos_bandos/ARCANA_V6_reina_obsidiana.glb"] }, "materials": "shared" } },
+    "k": { "rotationYDegrees": 90, "rigged": { "arcana": "rey", "files": { "w": ["arcana-v678/V7_Rey_marfil/ARCANA_V7_rey_marfil.glb"], "b": ["arcana-v678/V7_Rey_obsidiana/ARCANA_V7_rey_obsidiana.glb"] }, "materials": "shared" } }
   },
-  "heights": {
-    "p": 0.896,
-    "r": 1.008,
-    "n": 1.12,
-    "b": 1.288,
-    "q": 1.456,
-    "k": 1.624
-  },
-  "maxFootprint": 0.78,
-  "maxTriangles": 20000,
+  "heights": { "p": 0.8, "n": 0.94, "r": 1.0, "b": 1.08, "q": 1.16, "k": 1.24 },
+  "maxFootprint": 0.98,
+  "maxTriangles": 28000,
   "textureSize": 1024
 }
