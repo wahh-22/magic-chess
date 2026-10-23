@@ -8,6 +8,7 @@ import type { Color, PieceType } from "../../core/types";
 import type { PieceAttack, PieceModelProvider, PieceRig } from "./PieceModelProvider";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { createProceduralPieceProvider } from "./proceduralPieces";
+import { loadGLB } from "../../loading/assets";
 
 const TYPES: PieceType[] = ["p", "n", "b", "r", "q", "k"];
 const TOLERANCE = 0.005;
@@ -122,7 +123,12 @@ interface LoadOptions {
   warn?: (message: string, error: unknown) => void;
 }
 
-const loadGLTF: NonNullable<LoadOptions['load']> = url => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
+/** Browser default: byte progress on the loading bar; one parse per file for the session. */
+const loadGLTF: NonNullable<LoadOptions['load']> = typeof window === 'undefined'
+  ? url => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url)
+  : url => loadGLB(url, 'critical');
+/** Lets input and paint through between pieces: each bake is a few ms of CPU skinning. */
+const nextTask = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 const materialLibraries = new WeakMap<NonNullable<LoadOptions['load']>, Promise<Map<string, MeshStandardMaterial>>>();
 
 function loadMaterialLibrary(load: NonNullable<LoadOptions['load']>) {
@@ -167,7 +173,8 @@ export async function loadPieceModels({
     materials: Record<Color, MeshStandardMaterial | MeshStandardMaterial[]>;
     fragments: Record<Color, MeshStandardMaterial>;
     rig?: PieceRig;
-    parts?: Record<Color, RigidPart[]>;
+    /** Destruction parts are split on first use (or in idle time), not while loading. */
+    parts?: () => Record<Color, RigidPart[]> | undefined;
   }>();
   try {
     // Vite's HTML fallback gives a quiet 200 when optional public assets are absent;
@@ -189,6 +196,7 @@ export async function loadPieceModels({
       await Promise.all(variants.map(async ([color, entry]) => {
       try {
         const { scene, animations = [] } = await load(`/models/${entry.file}`);
+        await nextTask();
         const meshes: Mesh[] = [];
         scene.traverse((object) => {
           if (!(object instanceof Mesh)) return;
@@ -251,8 +259,9 @@ export async function loadPieceModels({
         const light = materials.length === 1 ? materials[0]! : materials;
         const fragment = new MeshStandardMaterial({ color: entry.fragmentColor, roughness: materials[0]!.roughness, metalness: 0 });
         // Use a private clone: sampling idle must not alter the live rig or collider bake.
-        let parts: Record<Color, RigidPart[]> | undefined;
-        if (rig) {
+        let split: Record<Color, RigidPart[]> | null | undefined;
+        const parts = rig ? () => {
+          if (split !== undefined) return split ?? undefined;
           const rest = cloneSkeleton(scene);
           const mixer = new AnimationMixer(rest);
           // Preserve the bind frame used by colliders, including pedestal placement.
@@ -262,8 +271,9 @@ export async function loadPieceModels({
           rest.traverse((object) => { if (object instanceof SkinnedMesh) rigidMeshes.push(object); });
           const armor = splitRigidParts(rigidMeshes);
           mixer.stopAllAction(); mixer.uncacheRoot(rest);
-          if (armor) parts = { w: armor, b: color ? armor : armor.map((part) => ({ ...part, materials: part.materials.map((material) => tinted(material as MeshStandardMaterial)) })) };
-        }
+          split = armor ? { w: armor, b: color ? armor : armor.map((part) => ({ ...part, materials: part.materials.map((material) => tinted(material as MeshStandardMaterial)) })) } : null;
+          return split ?? undefined;
+        } : undefined;
         loaded.set(color ? `${type}-${color}` : type, {
           geometry, rig, parts,
           materials: { w: light, b: color ? light : tinted(materials[0]!) },
@@ -281,7 +291,7 @@ export async function loadPieceModels({
   if (!loaded.size) return fallback;
   return {
     geometry: (type, color = 'w') => (loaded.get(`${type}-${color}`) ?? loaded.get(type))?.geometry ?? fallback.geometry(type, color),
-    parts: (type, color = 'w') => (loaded.get(`${type}-${color}`) ?? loaded.get(type))?.parts?.[color] ?? fallback.parts?.(type, color),
+    parts: (type, color = 'w') => (loaded.get(`${type}-${color}`) ?? loaded.get(type))?.parts?.()?.[color] ?? fallback.parts?.(type, color),
     rig: (type, color = 'w') => (loaded.get(`${type}-${color}`) ?? loaded.get(type))?.rig ?? fallback.rig?.(type, color),
     material: (type, color) => (loaded.get(`${type}-${color}`) ?? loaded.get(type))?.materials[color] ?? fallback.material(type, color),
     fragmentMaterial: (type, color) => (loaded.get(`${type}-${color}`) ?? loaded.get(type))?.fragments[color] ?? fallback.fragmentMaterial(type, color),

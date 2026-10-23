@@ -6,7 +6,10 @@ import type { MoveEvent, PieceInstance } from "../../core/types";
 import type { PieceModelProvider } from "../pieces/PieceModelProvider";
 import { createVoronoiFractureProvider } from "../fracture/voronoiFracture";
 import { modelBounds, planPieceColliders, type PieceColliderPlan } from "./pieceColliders";
-import { Suspense, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useStore } from "zustand";
+import { sceneLoader } from "../../loading/assets";
+import { EffectsWarmup } from "./EffectsWarmup";
 import { reactionFinished } from '../animation/presentationState';
 import { Debris, DebrisGround } from "./Debris";
 import { DustBurst } from "./DustBurst";
@@ -14,7 +17,7 @@ import { useEffectsStore } from "./effectsStore";
 import type { Burst } from './effectsStore';
 import type { FractureProvider } from '../fracture/FractureProvider';
 import { RigidPartsDebris } from '../fracture/RigidPartsDebris';
-import { selectDestructionParts } from './destructionParts';
+import { prewarmDestructionParts, selectDestructionParts } from './destructionParts';
 import { DEFAULT_EFFECTS_CONFIG } from '../../config/effects';
 import { readQuality } from '../environment/battlefieldConfig';
 import { DEFAULT_VFX_CONFIG } from '../../config/vfx';
@@ -80,8 +83,12 @@ export function DestructionLayer({ pieces, activeEvent, provider }: {
   const bursts = useEffectsStore((state) => state.bursts);
   const finishEffect = useEffectsStore((state) => state.finishEffect);
   const colliders = planPieceColliders(pieces, activeEvent, bounds);
+  // Once the scene is shown, split the destruction parts in idle time instead of at the first capture.
+  const ready = useStore(sceneLoader, (state) => state.stage === "ready");
+  useEffect(() => ready ? prewarmDestructionParts(provider, DEFAULT_EFFECTS_CONFIG.rigidParts[readQuality()]) : undefined, [ready, provider]);
   return (
     <group>
+      <EffectsWarmup provider={provider} />
       {bursts.filter((burst) => !burst.dustDone).map((burst) => (
         <ReactionGate key={burst.id} burst={burst}>
           <Delay ms={DEFAULT_VFX_CONFIG.dustLandDelayMs}>
