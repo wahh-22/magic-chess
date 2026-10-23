@@ -1,13 +1,18 @@
-import { useTexture } from "@react-three/drei";
 import { useEffect, useMemo } from "react";
+import { useTextures } from "../../loading/assets";
 import { MeshStandardMaterial, RepeatWrapping, SRGBColorSpace, Vector2, type MeshStandardMaterialParameters } from "three";
+
+/** Diffuse (sRGB), OpenGL normal and roughness maps of a CC0 surface in public/environment. */
+export function stoneMapUrls(asset: string): [string, string, string] {
+  return [`/environment/${asset}_diff.webp`, `/environment/${asset}_nor_gl.webp`, `/environment/${asset}_rough.webp`];
+}
 
 /**
  * Clone sampler state, not image data: cached CC0 sources remain untouched.
  * `overrides` must be a stable (module-level) object; it is applied last.
  */
 export function useStone(asset: string, repeatX = 1, repeatY = 1, color = "#ffffff", polished = false, overrides?: MeshStandardMaterialParameters) {
-  const maps = useTexture([`/environment/${asset}_diff.webp`, `/environment/${asset}_nor_gl.webp`, `/environment/${asset}_rough.webp`]);
+  const maps = useTextures(stoneMapUrls(asset));
   const material = useMemo(() => {
     const [map, normalMap, roughnessMap] = maps.map((source, index) => {
       const texture = source.clone();

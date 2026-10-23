@@ -1,16 +1,25 @@
-import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import {
   BufferGeometry, CanvasTexture, Euler, InstancedBufferAttribute, Matrix4, Mesh, PlaneGeometry, Quaternion, Vector3,
-  type InstancedMesh, type Material, type MeshStandardMaterial,
+  type InstancedMesh, type Material, type MeshBasicMaterial, type MeshStandardMaterial,
 } from "three";
+import { loadGLB, sceneLoader, useGLB } from "../../loading/assets";
+import { StreamIn } from "../StreamIn";
+import { QUALITY_PRESETS, type GraphicsQuality } from "./battlefieldConfig";
+import { usePlacements } from "./environmentData";
 import { terrainHeight } from "./landscape";
+import { applyReveal } from "./reveal";
 import { ruinFootprints } from "./ruins";
 import { placementFootprints, SCANNED_MODELS, type Placement, type ScannedModel } from "./scatterLayout";
 import { applyFoliage, applyStoneTone, windTime, type FoliageOptions } from "./wind";
 
 const url = (model: ScannedModel) => `/environment/models/${SCANNED_MODELS[model].id}.glb`;
+
+/** Dither fade of every scanned material while the props stream in (see StreamIn). */
+const natureReveal = { value: 0 };
+const fadeNature = (amount: number) => { natureReveal.value = amount; };
+const natureShown = () => sceneLoader.getState().secondaryLoaded();
 
 /** How each scanned model moves and is tinted; rocks stay still. */
 const FOLIAGE: Partial<Record<ScannedModel, FoliageOptions>> = {
@@ -33,8 +42,8 @@ interface Variant { height: number; parts: Part[] }
 
 /** Variants × LODs of one GLB: node extras carry { variant, lod, height } from the pipeline. */
 function useVariants(model: ScannedModel) {
-  // No Draco (the pipeline uses meshopt), so no decoder is ever fetched from a CDN.
-  const gltf = useGLTF(url(model), false, true);
+  // No Draco (the pipeline uses meshopt, decoded in workers), so no decoder is ever fetched from a CDN.
+  const gltf = useGLB(url(model), "secondary");
   return useMemo(() => {
     gltf.scene.updateMatrixWorld(true);
     const table = new Map<string, Variant>();
@@ -52,7 +61,10 @@ function useVariants(model: ScannedModel) {
     const tone = STONE_TONE[model];
     if (tone !== undefined) for (const variant of table.values()) for (const part of variant.parts) applyStoneTone(part.material, tone);
     for (const variant of table.values()) {
-      for (const part of variant.parts) (part.material as MeshStandardMaterial).envMapIntensity = 0.55;
+      for (const part of variant.parts) {
+        (part.material as MeshStandardMaterial).envMapIntensity = 0.55;
+        applyReveal(part.material, natureReveal);
+      }
     }
     return table;
   }, [gltf, model]);
@@ -143,6 +155,9 @@ function shadeTexture() {
  */
 function ContactShade({ footprints }: { footprints: [number, number, number][] }) {
   const mesh = useRef<InstancedMesh>(null);
+  const material = useRef<MeshBasicMaterial>(null);
+  // Already transparent: it fades in with the props through its opacity (no recompile).
+  useFrame(() => { if (material.current) material.current.opacity = natureReveal.value; });
   const texture = useMemo(() => shadeTexture(), []);
   const geometry = useMemo(() => new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), []);
   useEffect(() => () => { texture.dispose(); geometry.dispose(); }, [texture, geometry]);
@@ -159,16 +174,24 @@ function ContactShade({ footprints }: { footprints: [number, number, number][] }
     instanced.computeBoundingSphere();
   }, [footprints]);
   return <instancedMesh ref={mesh} args={[geometry, undefined, footprints.length]} renderOrder={-1} raycast={() => null}>
-    <meshBasicMaterial map={texture} color="#000000" transparent depthWrite={false} polygonOffset polygonOffsetFactor={-2} />
+    <meshBasicMaterial ref={material} map={texture} color="#000000" transparent depthWrite={false} polygonOffset polygonOffsetFactor={-2} />
   </instancedMesh>;
 }
 
 /**
  * Photoscanned CC0 nature (Poly Haven): olive trees with a far LOD tree line, maquis and dry
- * bushes, wind-swept grass, embedded boulders, rocks and pebbles. Loaded lazily behind the
- * menu; each variant/LOD/primitive is one instanced draw call.
+ * bushes, wind-swept grass, embedded boulders, rocks and pebbles. The secondary stage: it
+ * streams in after the board is on screen (scatter layout built in a worker), is prepared
+ * hidden, then fades in; each variant/LOD/primitive is one instanced draw call.
  */
-export function ScannedNature({ placements }: { placements: Placement[] }) {
+export function ScannedNature({ quality }: { quality: GraphicsQuality }) {
+  const placements = usePlacements(quality);
+  return <StreamIn key={quality} id={`nature-${quality}`} onFade={fadeNature} onShown={natureShown} postprocessing={QUALITY_PRESETS[quality].postprocessing}>
+    <NatureInstances placements={placements} />
+  </StreamIn>;
+}
+
+function NatureInstances({ placements }: { placements: Placement[] }) {
   const byModel = useMemo(() => {
     const map = new Map<ScannedModel, Placement[]>();
     for (const placement of placements) {
@@ -185,4 +208,7 @@ export function ScannedNature({ placements }: { placements: Placement[] }) {
   </>;
 }
 
-for (const model of Object.keys(SCANNED_MODELS) as ScannedModel[]) useGLTF.preload(url(model), false, true);
+/** Starts the secondary downloads (after the critical ones, so they do not compete for bandwidth). */
+export function preloadScannedNature() {
+  for (const model of Object.keys(SCANNED_MODELS) as ScannedModel[]) void loadGLB(url(model), "secondary").catch(() => undefined);
+}
