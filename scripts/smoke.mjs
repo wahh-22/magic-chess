@@ -15,6 +15,9 @@ const browser = await chromium.launch({
   args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+// Gameplay checks, not visuals: run on the low graphics preset (software GL renders the
+// full scene at well under 1 fps). Set GRAPHICS=high to exercise the high preset.
+await page.addInitScript((quality) => localStorage.setItem("magic-chess.graphics-quality", quality), process.env.GRAPHICS ?? "low");
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
 page.on("console", (message) => message.type() === "error" && errors.push(message.text()));
@@ -70,7 +73,14 @@ await expectState("scene renders", () => (globalThis.__frames ?? 0) > 5, 15000);
 // sizes or camera tweaks do not break the test.
 // Pieces are clicked on their upper body: a taller piece in front can hide the base.
 const project = (square, height = 0) => page.evaluate(([s, h]) => globalThis.__projectSquare(s, h), [square, height]);
-await page.mouse.click(...(await project("e2", 0.75)));
+// Aim at the pawn's upper body (70% of its real height): piece heights change with the model set,
+// and a fixed height can pass over a short piece into the hall behind the board.
+const pawnHeight = await page.evaluate(async () => {
+  const { loadPieceModels } = await import("/src/scene/pieces/gltfPieces.ts");
+  const { modelBounds } = await import("/src/scene/effects/pieceColliders.ts");
+  return modelBounds(await loadPieceModels()).p.height;
+});
+await page.mouse.click(...(await project("e2", pawnHeight * 0.7)));
 await expectState("click selects e2", () => globalThis.__gameStore.getState().selected === "e2");
 
 await page.mouse.click(...(await project("e4")));
