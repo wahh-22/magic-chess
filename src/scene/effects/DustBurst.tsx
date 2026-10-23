@@ -50,6 +50,19 @@ const fragmentShader = /* glsl */ `
   }
 `;
 
+/** One material per burst; also mounted hidden by EffectsWarmup so its program is linked while loading. */
+export function createDustMaterial(): ShaderMaterial {
+  sharedTexture ??= puffTexture();
+  return new ShaderMaterial({
+    uniforms: { uMap: { value: sharedTexture }, uColor: { value: new Color(config.color) }, uScale: { value: 600 } },
+    vertexShader,
+    fragmentShader,
+    transparent: true,
+    depthWrite: false,
+    blending: NormalBlending,
+  });
+}
+
 interface DustBurstProps {
   burst: Burst;
   onDone: () => void;
@@ -67,17 +80,7 @@ export function DustBurst({ burst, onDone }: DustBurstProps) {
     result.setAttribute("aOpacity", new BufferAttribute(new Float32Array(particles.length), 1));
     return result;
   }, [particles]);
-  const material = useMemo(() => {
-    sharedTexture ??= puffTexture();
-    return new ShaderMaterial({
-      uniforms: { uMap: { value: sharedTexture }, uColor: { value: new Color(config.color) }, uScale: { value: 600 } },
-      vertexShader,
-      fragmentShader,
-      transparent: true,
-      depthWrite: false,
-      blending: NormalBlending,
-    });
-  }, []);
+  const material = useMemo(() => createDustMaterial(), []);
   useEffect(() => () => {
     geometry.dispose();
     material.dispose();
