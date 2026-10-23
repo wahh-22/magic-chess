@@ -1,7 +1,7 @@
-import { useTexture } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
+import { gpuIdle, gpuQueue, useTexture } from "../../loading/assets";
 import { useEffect, useMemo } from "react";
-import { BackSide, LinearFilter, Mesh, NoColorSpace, PMREMGenerator, RepeatWrapping, Scene, ShaderMaterial, SphereGeometry } from "three";
+import { BackSide, LinearFilter, Mesh, NoColorSpace, PMREMGenerator, RepeatWrapping, Scene, ShaderMaterial, SphereGeometry, type WebGLRenderTarget } from "three";
 import { SKY } from "./battlefieldConfig";
 
 const vertexShader = /* glsl */ `
@@ -66,15 +66,24 @@ export function Sky({ intensity = 1, environmentIntensity = 1 }: { intensity?: n
   const geometry = useMemo(() => new SphereGeometry(10, 64, 32), []);
   useEffect(() => {
     const { gl, scene } = get();
-    const pmrem = new PMREMGenerator(gl);
-    const skyScene = new Scene();
-    skyScene.add(new Mesh(geometry, materials.lighting));
-    const target = pmrem.fromScene(skyScene, 0, 0.1, 100, { size: 512 });
-    pmrem.dispose();
-    scene.environment = target.texture;
+    let target: WebGLRenderTarget | undefined;
+    let disposed = false;
+    // Sequenced on the GPU queue: the scene's programs are warmed after the environment exists.
+    void gpuQueue.enqueue(async () => {
+      if (disposed) return;
+      const pmrem = new PMREMGenerator(gl);
+      const skyScene = new Scene();
+      skyScene.add(new Mesh(geometry, materials.lighting));
+      target = pmrem.fromScene(skyScene, 0, 0.1, 100, { size: 512 });
+      pmrem.dispose();
+      scene.environment = target.texture;
+      // The blur passes are heavy GPU work: wait for them without blocking the main thread.
+      await gpuIdle(gl);
+    });
     return () => {
-      if (scene.environment === target.texture) scene.environment = null;
-      target.dispose();
+      disposed = true;
+      if (target && scene.environment === target.texture) scene.environment = null;
+      target?.dispose();
     };
   }, [get, geometry, materials]);
   useEffect(() => { get().scene.environmentIntensity = environmentIntensity; }, [get, environmentIntensity]);
