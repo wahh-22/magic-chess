@@ -61,12 +61,25 @@ async function expectState(step, predicate, timeout = 5000) {
   }
 }
 
+// Regression guard for the loading work (docs/performance.md): the menu must stay responsive
+// while the scene loads, so pressing "Start game" as soon as it shows returns quickly. The
+// budget is generous (a busy main thread used to delay this click by 4–5 s).
+const START_CLICK_BUDGET_MS = 1000 * TIMEOUT_SCALE;
+
 await page.goto(url);
 await expectState("setup screen opens", () => globalThis.__gameStore?.getState().phase === "setup");
 await page.screenshot({ path: `${shots}/smoke-setup.png` });
 const startButton = page.getByRole("button", { name: "Start game" });
 await startButton.waitFor({ timeout: 60000 * TIMEOUT_SCALE });
+const clickedAt = Date.now();
 await startButton.click();
+const startClickMs = Date.now() - clickedAt;
+const responsive = startClickMs <= START_CLICK_BUDGET_MS;
+console.log(`${responsive ? "PASS" : "FAIL"} "Start game" click latency ${startClickMs} ms (budget ${START_CLICK_BUDGET_MS} ms)`);
+if (!responsive) {
+  await browser.close();
+  process.exit(1);
+}
 // Pressed early, the game waits behind the loading screen until the critical set is ready.
 await expectState("game starts", () => globalThis.__gameStore?.getState().phase === "playing", 60000);
 // A few frames are enough: clicks are projected with the live camera, not fixed pixels.
