@@ -12,3 +12,7 @@ assets/models/source/*
 !assets/models/source/README.md
 !assets/models/source/LICENSE.md
 # public/models is intentionally tracked: cleaned assets ship with the game.
+
+# Local secrets (Meshy API key, etc.)
+.env
+.env.*

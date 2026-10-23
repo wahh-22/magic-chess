@@ -41,6 +41,9 @@ const browser = await chromium.launch({
   args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+// Gameplay checks, not visuals: run on the low graphics preset (software GL renders the
+// full scene at well under 1 fps). Set GRAPHICS=high to exercise the high preset.
+await page.addInitScript((quality) => localStorage.setItem("magic-chess.graphics-quality", quality), process.env.GRAPHICS ?? "low");
 page.setDefaultTimeout(60000);
 const errors = [];
 let currentScenario = "startup";
