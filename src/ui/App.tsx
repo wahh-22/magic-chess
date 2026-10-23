@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { MuteToggle } from "../audio/MuteToggle";
 import { useGameSounds } from "../audio/useGameSounds";
 import type { MoveEvent } from "../core/types";
@@ -9,14 +9,16 @@ import { planCinematicShot, qualifiesForCinematic, type CinematicShot } from "..
 import { CinematicToggle, readCinematicEnabled } from "../scene/camera/CinematicToggle";
 import { effectsStore } from "../scene/effects/effectsStore";
 import { ChessScene } from "../scene/ChessScene";
-import { QUALITY_KEY, readQuality, type GraphicsQuality } from "../scene/environment/chamberConfig";
+import { QUALITY_KEY, readQuality, type GraphicsQuality } from "../scene/environment/battlefieldConfig";
 import { Pieces } from "../scene/Pieces";
 import { createProceduralPieceProvider } from "../scene/pieces/proceduralPieces";
 import { loadPieceModels } from "../scene/pieces/gltfPieces";
 import { useGameStore } from "./gameStore";
 import { PromotionPicker } from "./PromotionPicker";
 import { SetupScreen } from "./SetupScreen";
-import { Hud } from "./Hud";
+import { GameActions, Hud } from "./Hud";
+import { CreditsDialog } from "./CreditsDialog";
+import { SettingsMenu } from "./SettingsMenu";
 import { GameOverScreen } from "./GameOverScreen";
 
 // Physics (Rapier + its WASM) is only needed at the first capture, so it loads in the
@@ -69,6 +71,10 @@ export function App() {
     }
   }
 
+  const [creditsOpen, setCreditsOpen] = useState(false);
+  const openCredits = useCallback(() => setCreditsOpen(true), []);
+  const closeCredits = useCallback(() => setCreditsOpen(false), []);
+
   return (
     <div className="app">
       <ChessScene quality={quality} paused={phase === "setup"}>
@@ -91,20 +97,27 @@ export function App() {
           <DestructionLayer pieces={pieces} activeEvent={activeEvent} provider={models} />
         </Suspense>
       </ChessScene>
-      {phase === "setup" ? <SetupScreen /> : <Hud />}
+      {phase === "setup" ? <SetupScreen onCredits={openCredits} /> : <Hud />}
       {phase === "over" && <GameOverScreen />}
       <PromotionPicker />
-      <div className="settings-bar">
-        <label className="graphics-quality">
-          Graphics{" "}
-          <select aria-label="Graphics quality" value={quality} onChange={(event) => setQuality(event.target.value as GraphicsQuality)}>
-            <option value="high">High</option>
-            <option value="low">Low</option>
-          </select>
-        </label>
-        <CinematicToggle enabled={cinematicEnabled} onChange={setCinematicEnabled} />
-        <MuteToggle provider={soundProvider} />
-      </div>
+      <nav className="command-bar" aria-label="Game commands">
+        {phase !== "setup" && <GameActions />}
+        <SettingsMenu>{(close) => <>
+          <label className="setting-row">
+            <span>Graphics</span>
+            <select aria-label="Graphics quality" value={quality} onChange={(event) => setQuality(event.target.value as GraphicsQuality)}>
+              <option value="high">High</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+          <div className="setting-row"><CinematicToggle enabled={cinematicEnabled} onChange={setCinematicEnabled} /></div>
+          <div className="setting-row"><MuteToggle provider={soundProvider} /></div>
+          <div className="setting-row">
+            <button type="button" onClick={() => { close(); openCredits(); }}>Credits</button>
+          </div>
+        </>}</SettingsMenu>
+      </nav>
+      {creditsOpen && <CreditsDialog onClose={closeCredits} />}
     </div>
   );
 }

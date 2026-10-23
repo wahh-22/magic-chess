@@ -1,6 +1,7 @@
 import type { MoveEvent, PieceType } from "../../core/types";
 import type { Impact } from "../animation/planMove";
 import { squareToWorld } from "../coords";
+import { CAMERA_BOUNDS } from "../environment/battlefieldConfig";
 import { DEFAULT_CINEMATIC_CONFIG, type CinematicConfig } from "./cinematicConfig";
 
 export type Point3 = [number, number, number];
@@ -40,6 +41,19 @@ export function planCinematicShot(
         config.height, z - uz * config.distance + ux * config.sideways],
     },
   };
+}
+
+/** Cinematic targets can move to edge squares; constrain their camera in world space,
+ * not just its distance to the moving target: above the plaza and inside the ruins. */
+export function constrainScenePose(pose: CameraPose): CameraPose {
+  const [x, y, z] = pose.position;
+  const radius = Math.hypot(x, z);
+  const scale = radius > CAMERA_BOUNDS.radius ? CAMERA_BOUNDS.radius / radius : 1;
+  return { target: pose.target, position: [
+    x * scale,
+    Math.max(CAMERA_BOUNDS.minY, Math.min(CAMERA_BOUNDS.maxY, y)),
+    z * scale,
+  ] };
 }
 
 /** Clamped smoothstep has zero velocity at both ends, including a skipped return. */

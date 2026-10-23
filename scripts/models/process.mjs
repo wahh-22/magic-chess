@@ -1,11 +1,14 @@
 import { Document, NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshoptCompression, EXTTextureWebP } from '@gltf-transform/extensions';
-import { reorder, weld } from '@gltf-transform/functions';
+import { cloneDocument, reorder, weld, prune } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import { BufferGeometry, BufferAttribute, Matrix4 } from 'three';
 import sharp from 'sharp';
 import { mkdir, readFile, writeFile, glob } from 'node:fs/promises';
 import { resolve, basename, join } from 'node:path';
+import { createMaterialLibrary } from './arcana-textures.mjs';
+import { compactAccessors } from './arcana-v4.mjs';
+import { V678_INTEGRATION, readClipExtras, readRigExtras, v678Contract } from './arcana-v678.mjs';
 
 export function createIO() {
   return new NodeIO().registerExtensions(ALL_EXTENSIONS)
@@ -20,7 +23,7 @@ export async function compressDocument(document) {
   await MeshoptEncoder.ready;
   await document.transform(reorder({ encoder: MeshoptEncoder, target: 'size' }));
   document.createExtension(EXTMeshoptCompression).setRequired(true)
-    .setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE });
+    .setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.FILTER });
 }
 
 function validateOptions(options) {
@@ -222,24 +225,71 @@ export async function processModels({ source, out, manifest, warn = console.warn
   const result = { version: 1, pieces: {} };
   // Process everything before writing: malformed sources do not replace the manifest.
   const outputs = [];
+  const library = createMaterialLibrary();
+  let sharedMaterials = false;
   for (const [type, settings] of Object.entries(manifest.pieces)) {
     if (!['p', 'n', 'b', 'r', 'q', 'k'].includes(type)) throw new Error(`Unknown piece type: ${type}`);
     if (settings.rigged) {
-      validateOptions({ ...manifest, height: manifest.heights[type], rotationYDegrees: settings.rotationYDegrees });
-      const patterns = settings.rigged.files;
-      if (!Array.isArray(patterns) || !patterns.length || patterns.some((p) => typeof p !== 'string' || p.includes('..') || p.startsWith('/') || !p.endsWith('.glb'))) throw new Error(`Invalid rigged files for ${type}`);
-      const files = new Set();
-      for (const pattern of patterns) for await (const file of glob(pattern, { cwd: source })) files.add(file);
-      if (!files.size) { warn(`Skipping missing rigged model: ${patterns.join(', ')}`); continue; }
-      try {
-        const { processRigged } = await import('./rigged.mjs');
-        const docs = [];
-        for (const file of [...files].sort()) docs.push(await io.read(resolve(source, file)));
-        const processed = await processRigged(docs, { ...manifest, height: manifest.heights[type], rotationYDegrees: settings.rotationYDegrees }, settings.rigged, warn);
-        await compressDocument(processed.document);
-        outputs.push({ type, binary: await io.writeBinary(processed.document), file: [...files].join(', '), before: processed.trianglesBefore, after: processed.entry.triangles });
-        result.pieces[type] = { file: `${type}.glb`, ...processed.entry };
-      } catch (error) { throw new Error(`Failed to process rigged ${type}: ${error.message}`, { cause: error }); }
+      validateOptions({ ...manifest, maxTriangles: settings.rigged.maxTriangles ?? manifest.maxTriangles, height: manifest.heights[type], rotationYDegrees: settings.rotationYDegrees });
+      const variants = Array.isArray(settings.rigged.files) ? { legacy: settings.rigged.files } : settings.rigged.files;
+      if (!variants || typeof variants !== 'object' || (!Array.isArray(settings.rigged.files) && (Object.keys(variants).sort().join(',') !== 'b,w'))) throw new Error(`Invalid rigged colors for ${type}: expected w and b`);
+      for (const [color, patterns] of Object.entries(variants)) {
+        const outputType = color === 'legacy' ? type : `${type}-${color}`;
+        if (!Array.isArray(patterns) || !patterns.length || patterns.some((p) => typeof p !== 'string' || p.includes('..') || p.startsWith('/') || !(/\.(glb|gltf)$/.test(p)))) throw new Error(`Invalid rigged files for ${type}`);
+        const files = new Set();
+        for (const pattern of patterns) for await (const file of glob(pattern, { cwd: source })) files.add(file);
+        if (!files.size) {
+          if (color !== 'legacy') throw new Error(`Missing rigged ${type}-${color}: ${patterns.join(', ')}`);
+          warn(`Skipping missing rigged model: ${patterns.join(', ')}`); continue;
+        }
+        try {
+          const { processRigged } = await import('./rigged.mjs');
+          const docs = [];
+          for (const file of [...files].sort()) docs.push(await io.read(resolve(source, file)));
+          let integration, pedestal, contract;
+          if (settings.rigged.arcana) {
+            const role = settings.rigged.arcana;
+            if (!['rey', 'reina', 'alfil', 'caballo', 'torre', 'peon'].includes(role) || !['w', 'b'].includes(color)) throw new Error('Invalid ARCANA V6–V8 role/color');
+            const json = V678_INTEGRATION[role];
+            const data = json ? JSON.parse(await readFile(join(source, json), 'utf8')) : undefined;
+            const clips = readClipExtras(docs[0]), rig = readRigExtras(docs[0]);
+            contract = scale => v678Contract(clips, rig, type, scale, data);
+            // V6–V8 ship no pedestal: the matching V4 prop keeps gliding pieces on their base.
+            pedestal = await io.read(join(source, 'arcana-v4/ARCANA_V4/utileria', `pedestal_${role}_${color === 'w' ? 'marfil' : 'obsidiana'}.glb`));
+          }
+          if (settings.rigged.v4) {
+            const role = settings.rigged.v4;
+            if (!['rey', 'reina', 'alfil', 'caballo', 'torre', 'peon'].includes(role) || !['w', 'b'].includes(color)) throw new Error('Invalid V4 role/color');
+            const base = resolve(source, 'arcana-v4/ARCANA_V4');
+            integration = JSON.parse(await readFile(join(base, 'integracion', `${role}.json`), 'utf8'));
+            pedestal = await io.read(join(base, 'utileria', `pedestal_${role}_${color === 'w' ? 'marfil' : 'obsidiana'}.glb`));
+          }
+          if (settings.rigged.materials === 'shared') {
+            sharedMaterials = true;
+            library.add(docs[0]);
+            if (pedestal) library.add(pedestal);
+          }
+          const processed = await processRigged(docs, { ...manifest, maxTriangles: settings.rigged.maxTriangles ?? manifest.maxTriangles, height: manifest.heights[type], rotationYDegrees: settings.rotationYDegrees }, { ...settings.rigged, integration, pedestal, contract, type }, warn);
+          await compressDocument(processed.document);
+          const output = { type: outputType, binary: await io.writeBinary(processed.document), file: [...files].join(', '), before: processed.trianglesBefore, after: processed.entry.triangles };
+          outputs.push(output);
+          // Retain old public URLs as white aliases without destructive cleanup.
+          if (color === 'w') {
+            if (settings.rigged.v4 || settings.rigged.arcana) {
+              const alias = cloneDocument(processed.document);
+              for (const clip of alias.getRoot().listAnimations()) clip.dispose();
+              // Never loaded by the game: geometry and skeleton only (no clips, no UVs).
+              await alias.transform(prune({ keepLeaves: true }));
+              compactAccessors(alias);
+              await compressDocument(alias);
+              outputs.push({ ...output, type, binary: await io.writeBinary(alias) });
+            } else outputs.push({ ...output, type });
+          }
+          const entry = { file: `${outputType}.glb`, ...processed.entry };
+          if (color === 'legacy') result.pieces[type] = entry;
+          else (result.pieces[type] ??= { colors: {} }).colors[color] = entry;
+        } catch (error) { throw new Error(`Failed to process rigged ${outputType}: ${error.message}`, { cause: error }); }
+      }
       continue;
     }
     if (basename(settings.file) !== settings.file || !settings.file.endsWith('.glb')) throw new Error(`Invalid source filename: ${settings.file}`);
@@ -256,6 +306,11 @@ export async function processModels({ source, out, manifest, warn = console.warn
       result.pieces[type] = { file: `${type}.glb`, ...processed.entry };
       outputs.push({ type, binary, file, before: processed.trianglesBefore, after: processed.entry.triangles });
     } catch (error) { throw new Error(`Failed to process ${file}: ${error.message}`, { cause: error }); }
+  }
+  if (sharedMaterials) {
+    const document = await library.finish(manifest.textureSize);
+    outputs.push({ type: 'arcana-materials', binary: await io.writeBinary(document), file: 'shared PBR library', before: 0, after: 0 });
+    result.materialLibrary = 'arcana-materials.glb';
   }
   await mkdir(out, { recursive: true });
   for (const { type, binary, file, before, after } of outputs) {

@@ -49,6 +49,117 @@ it('preserves a normalized skin, merges separate clips, detects the forward hand
   for (let i = 0; i < p.getAttribute('WEIGHTS_0').getCount(); i++) expect(p.getAttribute('WEIGHTS_0').getElement(i, []).reduce((a, b) => a + b, 0)).toBeCloseTo(1, 5);
 });
 
+it('writes both color variants with flat PBR materials and only selected clips', async () => {
+  await mkdir('.shots', { recursive: true });
+  const dir = await mkdtemp(resolve('.shots/arcana-test-'));
+  const manifest = await writeRiggedFixture(join(dir, 'source'));
+  manifest.pieces.p.rigged = {
+    files: { w: ['idle.glb'], b: ['idle.glb'] },
+    materials: 'preserve', clips: { idle: 'idle' },
+  };
+  // Both fixture clips are deliberately present: undeclared attacks must be removed.
+  const idleFile = 'pawn-*.glb';
+  manifest.pieces.p.rigged.files = { w: [idleFile], b: [idleFile] };
+  const result = await processModels({ source: join(dir, 'source'), out: join(dir, 'out'), manifest, log: vi.fn() });
+  for (const color of ['w', 'b']) {
+    expect(result.pieces.p.colors[color]).toMatchObject({ file: `p-${color}.glb`, skinned: true, clips: { idle: 'idle' } });
+    const doc = await createIO().read(join(dir, `out/p-${color}.glb`));
+    expect(doc.getRoot().listTextures()).toHaveLength(0);
+    expect(doc.getRoot().listMaterials()[0].getBaseColorFactor()).toEqual(riggedFixture().getRoot().listMaterials()[0].getBaseColorFactor());
+    expect(doc.getRoot().listAnimations().map((a) => a.getName())).toEqual(['idle']);
+  }
+  manifest.pieces.p.rigged.files.b = ['missing.glb'];
+  await expect(processModels({ source: join(dir, 'source'), out: join(dir, 'missing'), manifest })).rejects.toThrow('Missing rigged p-b');
+  manifest.pieces.p.rigged.files = { w: [idleFile] };
+  await expect(processModels({ source: join(dir, 'source'), out: join(dir, 'bad'), manifest })).rejects.toThrow('colors');
+});
+
+it('retains distinct flat material factors and simplifies complete skinned vertices', async () => {
+  const source = riggedFixture();
+  const gold = source.createMaterial('gold').setBaseColorFactor([0.9, 0.6, 0.1, 1]).setMetallicFactor(0.8).setRoughnessFactor(0.3);
+  source.getRoot().listMeshes()[0].listPrimitives()[1].setMaterial(gold);
+  const result = await processRigged([source], { height: 1.24, maxFootprint: 0.98, maxTriangles: 100, textureSize: 16, rotationYDegrees: 90 }, { materials: 'preserve', clips: { idle: 'idle' } });
+  expect(result.entry.triangles).toBeLessThanOrEqual(100);
+  expect(result.document.getRoot().listTextures()).toHaveLength(0);
+  expect(result.document.getRoot().listMaterials().map((m) => [m.getName(), m.getBaseColorFactor(), m.getMetallicFactor(), m.getRoughnessFactor()])).toContainEqual(['gold', [0.9, 0.6, 0.1, 1], 0.8, 0.3]);
+  expect(result.document.getRoot().listMeshes()[0].listPrimitives()).toHaveLength(2);
+  for (const p of result.document.getRoot().listMeshes()[0].listPrimitives()) {
+    expect(p.getAttribute('POSITION').getNormalized()).toBe(true);
+    expect(p.getAttribute('JOINTS_0').getCount()).toBe(p.getAttribute('POSITION').getCount());
+    for (let i = 0; i < p.getAttribute('WEIGHTS_0').getCount(); i++) expect(p.getAttribute('WEIGHTS_0').getElement(i, []).reduce((a, b) => a + b, 0)).toBeCloseTo(1, 5);
+  }
+});
+
+it('keeps rigid triangles on their original bone while sharing textured materials', async () => {
+  const source = riggedFixture();
+  const sharp = (await import('sharp')).default;
+  const image = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#8899aa' } }).png().toBuffer();
+  const texture = source.createTexture('steel_basecolor').setMimeType('image/png').setImage(image);
+  source.getRoot().listMaterials()[0].setBaseColorTexture(texture);
+  // Exported tangents and baked vertex colors are not read by the shared library materials.
+  for (const p of source.getRoot().listMeshes()[0].listPrimitives()) {
+    const count = p.getAttribute('POSITION').getCount();
+    p.setAttribute('TANGENT', source.createAccessor().setType('VEC4').setBuffer(source.getRoot().listBuffers()[0]).setArray(new Float32Array(count * 4).fill(1)));
+    p.setAttribute('COLOR_0', source.createAccessor().setType('VEC4').setBuffer(source.getRoot().listBuffers()[0]).setArray(new Float32Array(count * 4).fill(1)));
+  }
+  const result = await processRigged([source], { height: 1, maxFootprint: 0.98, maxTriangles: 100, textureSize: 16, rotationYDegrees: 90 }, { materials: 'shared', clips: { idle: 'idle' } });
+  expect(result.document.getRoot().listTextures()).toHaveLength(0);
+  expect(result.entry.triangles).toBeLessThanOrEqual(100);
+  for (const mesh of result.document.getRoot().listMeshes()) for (const p of mesh.listPrimitives()) {
+    // Textures are detached into the library, but their UVs must still ship.
+    expect(p.getAttribute('TEXCOORD_0')?.getCount()).toBe(p.getAttribute('POSITION').getCount());
+    expect(p.getAttribute('TANGENT')).toBeNull();
+    expect(p.getAttribute('COLOR_0')).toBeNull();
+    const ids = p.getIndices().getArray();
+    for (let i = 0; i < ids.length; i += 3) {
+      const owners = Array.from(ids.slice(i, i + 3), id => {
+        const weights = p.getAttribute('WEIGHTS_0').getElement(id, []);
+        expect(weights.filter(w => w > 0)).toEqual([1]);
+        return p.getAttribute('JOINTS_0').getElement(id, [])[weights.indexOf(1)];
+      });
+      expect(new Set(owners).size).toBe(1);
+    }
+  }
+});
+
+it('preserves blended and cross-bone triangles in the shared path', async () => {
+  const options = { height: 1, maxFootprint: 0.98, maxTriangles: 100, textureSize: 16, rotationYDegrees: 90 };
+  const blended = riggedFixture();
+  blended.getRoot().listMeshes()[0].listPrimitives()[0].getAttribute('WEIGHTS_0').setElement(0, [0.5, 0.5, 0, 0]);
+  const result = await processRigged([blended], options, { materials: 'shared' });
+  expect(result.document.getRoot().listMeshes().flatMap(m => m.listPrimitives()).some(p => Array.from(p.getAttribute('WEIGHTS_0').getArray()).some(w => w > 0 && w < 255))).toBe(true);
+  const crossed = riggedFixture();
+  const primitive = crossed.getRoot().listMeshes()[0].listPrimitives()[0];
+  const id = primitive.getIndices().getElement(0, [])[0];
+  const joint = primitive.getAttribute('JOINTS_0').getElement(id, []);
+  joint[0] = (joint[0] + 1) % 3;
+  primitive.getAttribute('JOINTS_0').setElement(id, joint);
+  await expect(processRigged([crossed], options, { materials: 'shared' })).resolves.toHaveProperty('entry.skinned', true);
+});
+
+it('deduplicates shared images across named palettes without losing normal or ORM slots', async () => {
+  const { createMaterialLibrary } = await import('./arcana-textures.mjs');
+  const sharp = (await import('sharp')).default;
+  const library = createMaterialLibrary();
+  const image = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#8888ff' } }).png().toBuffer();
+  for (const color of ['marfil', 'obsidiana']) {
+    const source = riggedFixture();
+    const texture = source.createTexture('steel_normal').setMimeType('image/png').setImage(image);
+    source.getRoot().listMaterials()[0].setName(`${color}_steel`).setNormalTexture(texture).setMetallicRoughnessTexture(texture).setOcclusionTexture(texture);
+    library.add(source);
+    library.add(source);
+  }
+  const doc = await library.finish(16);
+  expect(doc.getRoot().listTextures()).toHaveLength(1);
+  expect(doc.getRoot().listTextures()[0].getMimeType()).toBe('image/webp');
+  expect(doc.getRoot().listMaterials().map(m => m.getName())).toEqual(['marfil_steel', 'obsidiana_steel']);
+  for (const material of doc.getRoot().listMaterials()) {
+    expect(material.getNormalTexture()).toBe(doc.getRoot().listTextures()[0]);
+    expect(material.getMetallicRoughnessTexture()).toBe(material.getNormalTexture());
+    expect(material.getOcclusionTexture()).toBe(material.getNormalTexture());
+  }
+});
+
 it('rejects mismatched skeletons, missing clips and out-of-range overrides; warns if no hit bone exists', async () => {
   const options = { height: 1, maxFootprint: 0.78, maxTriangles: 20000, textureSize: 16, rotationYDegrees: -90 };
   const settings = { clips: { idle: 'idle', attack: 'attack' }, hitTimeMs: null };
@@ -63,4 +174,18 @@ it('rejects mismatched skeletons, missing clips and out-of-range overrides; warn
   const result = await processRigged(sources, options, settings, warn);
   expect(result.entry.hitTimeMs).toBe(500);
   expect(warn).toHaveBeenCalledWith(expect.stringContaining('no right-hand/weapon bone'));
+});
+
+it('rests a contract rig in its idle guard so bounds, colliders and debris match what plays', async () => {
+  const idle = riggedFixture('idle');
+  // The exported rest pose differs from the guard's first key (V6–V8 hold weapons forward at rest).
+  idle.getRoot().listAnimations()[0].listSamplers()[0].getOutput().setArray(new Float32Array([0.5, 0, 0, 0.5, 0.04, 0, 0.5, 0, 0]));
+  const attack = { clip: 'attack0', durationMs: 1000, hitMs: 400, activeEndMs: 500, trailStartMs: 300, trailEndMs: 500 };
+  const contract = () => ({ selectors: { idle: 'idle', attack0: 'attack' }, attacks: [attack], weaponTip: 'mixamorig:RightHand' });
+  const options = { height: 1, maxFootprint: 0.98, maxTriangles: 20000, textureSize: 16, rotationYDegrees: 90 };
+  const result = await processRigged([idle, riggedFixture('attack')], options, { materials: 'shared', contract });
+  const hand = result.document.getRoot().listNodes().find(n => n.getName() === 'mixamorig:RightHand');
+  expect(hand.getTranslation()).toEqual([0.5, 0, 0]);
+  expect(result.entry.rig.attacks).toEqual([attack]);
+  expect(result.document.getRoot().listAnimations().map(a => a.getName()).sort()).toEqual(['attack0', 'idle']);
 });

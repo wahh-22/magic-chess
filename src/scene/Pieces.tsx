@@ -1,7 +1,9 @@
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { Fragment, useEffect, useMemo, useRef } from "react";
 import { Quaternion, Vector3, type Object3D } from "three";
-import { createRigPlayback } from "./pieces/rigPlayback";
+import { createRigPlayback, type RigPlaybackState } from "./pieces/rigPlayback";
+import { phaseAt, rigTiming, sampleMotion, stablePhase, type RuntimeRig } from './animation/motion';
+import { publishImpactClock, rigState } from './animation/presentationState';
 import { sampleAttack } from "./animation/attackChoreography";
 import { ImpactShake, type ShakeImpulse } from "./camera/CameraImpactShake";
 import { DEFAULT_ANIMATION_CONFIG } from "../config/animation";
@@ -14,18 +16,25 @@ import { squareToWorld } from "./coords";
 import { FACING } from "./facing";
 import { createProceduralPieceProvider } from "./pieces/proceduralPieces";
 import type { PieceModelProvider } from "./pieces/PieceModelProvider";
+import { WeaponTrail } from "./effects/WeaponTrail";
+import { PedestalVisual } from './animation/PedestalVisual';
+import { pedestalPresentation } from './effects/pedestalFade';
 
-function RiggedVisual({ piece, models, attackTime }: { piece: PieceInstance; models: PieceModelProvider; attackTime: () => number | undefined }) {
-  const rig = models.rig!(piece.type)!;
+function RiggedVisual({ piece, models, state, trailWindow }: { piece: PieceInstance; models: PieceModelProvider; state: () => RigPlaybackState | undefined; trailWindow: () => { startMs: number; endMs: number } | undefined }) {
+  const rig: RuntimeRig = models.rig!(piece.type, piece.color)!;
   const material = models.material(piece.type, piece.color);
   const playback = useMemo(() => {
     // Stable per-piece pseudo-random phase; render remains pure under StrictMode.
-    const seed = [...piece.id].reduce((hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619), 2166136261) >>> 0;
-    return createRigPlayback(rig, material, seed / 4294967296);
+    return createRigPlayback(rig, material, stablePhase(piece.id));
   }, [rig, material, piece.id]);
   useEffect(() => { playback.resume(); return () => playback.dispose(); }, [playback]);
-  useFrame((_, delta) => playback.update(delta, attackTime()), -1);
-  return <primitive object={playback.scene} dispose={null} />;
+  useFrame((_, delta) => playback.update(delta, state()), -1);
+  return <>
+    <primitive object={playback.scene} dispose={null} />
+    {(rig.clips.attack || rig.attacks?.length || rig.clips.attacks?.length) && <WeaponTrail scene={playback.scene} type={piece.type}
+      attackTime={() => { const current = state(); return current?.role === 'attack' ? current.timeMs : undefined; }}
+      hitTimeMs={rig.hitTimeMs ?? 0} tipBone={rig.weaponTip} window={trailWindow} />}
+  </>;
 }
 
 interface PiecesProps {
@@ -43,12 +52,15 @@ interface PiecesProps {
 export function Pieces({ pieces, activeEvent, onAnimationDone, onImpact, provider, onPieceClick }: PiecesProps) {
   const models = useMemo(() => provider ?? createProceduralPieceProvider(), [provider]);
   const meshes = useRef(new Map<string, Object3D>());
-  const attackerType = pieces.find((piece) => piece.id === activeEvent?.pieceId)?.type;
-  const attackerRig = attackerType ? models.rig?.(attackerType) : undefined;
+  const attacker = pieces.find((piece) => piece.id === activeEvent?.pieceId);
+  const attackerType = attacker?.type;
+  const attackerRig = attacker ? models.rig?.(attacker.type, attacker.color) : undefined;
+  const rook = pieces.find(piece => piece.id === activeEvent?.rookMove?.pieceId);
+  const rookRig = rook ? models.rig?.(rook.type, rook.color) : undefined;
   const bounds = useMemo(() => modelBounds(models), [models]);
   const plan = useMemo(() => (activeEvent
-    ? planMove(activeEvent, DEFAULT_ANIMATION_CONFIG, captureContactDistance(pieces, activeEvent, bounds), attackerType, attackerRig?.clips.attack ? attackerRig : undefined)
-    : undefined), [activeEvent, pieces, bounds, attackerType, attackerRig]);
+    ? planMove(activeEvent, DEFAULT_ANIMATION_CONFIG, captureContactDistance(pieces, activeEvent, bounds), attackerType, rigTiming(attackerRig), rigTiming(rookRig))
+    : undefined), [activeEvent, pieces, bounds, attackerType, attackerRig, rookRig]);
   const playback = useRef<
     { plan: NonNullable<typeof plan>; startedAt?: number; elapsed?: number; impacted: boolean; done: boolean } | undefined
   >(undefined);
@@ -82,14 +94,20 @@ export function Pieces({ pieces, activeEvent, onAnimationDone, onImpact, provide
     current.startedAt ??= now;
     const elapsed = now - current.startedAt;
     current.elapsed = elapsed;
+    if (plan.impact) publishImpactClock(plan.impact, elapsed);
 
     for (const track of plan.tracks) {
       const mesh = meshes.current.get(track.pieceId);
       if (!mesh) continue;
       const sample = sampleTrack(track, elapsed, DEFAULT_ANIMATION_CONFIG);
-      mesh.position.set(sample.x, sample.y, sample.z);
+      const piece = pieces.find(piece => piece.id === track.pieceId);
+      const pedestal = piece ? models.rig?.(piece.type, piece.color)?.pedestal : undefined;
+      mesh.position.set(sample.x, sample.y + (pedestal ? pedestalPresentation(track, elapsed, pedestal.height).height : 0), sample.z);
       mesh.visible = sample.visible;
-      if (plan.skeletalAttack?.pieceId === track.pieceId && plan.impact) {
+      if (track.motion?.length) mesh.rotation.set(0, sampleMotion(track.motion, elapsed).yaw, 0);
+      const reaction = phaseAt(plan.phases?.filter(p => p.pieceId === track.pieceId && p.kind === 'hit') ?? [], elapsed);
+      if (reaction) mesh.rotation.set(0, reaction.toYaw, 0);
+      if (!track.motion && plan.skeletalAttack?.pieceId === track.pieceId && plan.impact) {
         const [dx, dz] = plan.impact.direction;
         mesh.rotation.set(0, -Math.atan2(dz, dx), 0);
       }
@@ -126,9 +144,14 @@ export function Pieces({ pieces, activeEvent, onAnimationDone, onImpact, provide
       <ImpactShake impulse={shake} />
       {pieces.map((piece) => {
         const [x, z] = squareToWorld(piece.square);
+        const pedestal = models.rig?.(piece.type, piece.color)?.pedestal;
         return (
+          <Fragment key={piece.id}>
+          {pedestal && <PedestalVisual pedestal={pedestal} position={[x, z]} yaw={FACING[piece.color]} clock={() => {
+            const current = playback.current;
+            return { track: current?.plan.tracks.find(track => track.pieceId === piece.id), elapsedMs: current?.elapsed ?? 0 };
+          }} />}
           <group
-            key={piece.id}
             ref={(mesh) => {
               if (mesh) meshes.current.set(piece.id, mesh);
               else meshes.current.delete(piece.id);
@@ -140,15 +163,20 @@ export function Pieces({ pieces, activeEvent, onAnimationDone, onImpact, provide
               onPieceClick?.(piece.square);
             }}
           >
-            {models.rig?.(piece.type) ? <RiggedVisual
+            {models.rig?.(piece.type, piece.color) ? <RiggedVisual
               piece={piece} models={models}
-              attackTime={() => {
+              state={() => {
                 const current = playback.current;
-                const attack = current?.plan.skeletalAttack;
-                return attack?.pieceId === piece.id && current?.elapsed !== undefined ? current.elapsed - attack.startMs : undefined;
+                return rigState(current?.plan, piece.id, current?.elapsed);
               }}
-            /> : <mesh geometry={models.geometry(piece.type)} material={models.material(piece.type, piece.color)} castShadow receiveShadow />}
+              trailWindow={() => {
+                const attack = playback.current?.plan.skeletalAttack;
+                return attack?.pieceId === piece.id && attack.trailStartMs !== undefined && attack.trailEndMs !== undefined
+                  ? { startMs: attack.trailStartMs, endMs: attack.trailEndMs } : undefined;
+              }}
+            /> : <mesh geometry={models.geometry(piece.type, piece.color)} material={models.material(piece.type, piece.color)} castShadow receiveShadow />}
           </group>
+          </Fragment>
         );
       })}
     </group>

@@ -194,16 +194,37 @@ describe("gameStore", () => {
     expect(store.getState().animationQueue[0]?.uci).toBe("e2e4");
   });
 
-  it("does not leave the AI thinking after initialization already failed", async () => {
-    const { store, engine } = setup();
-    vi.mocked(engine.newGame).mockRejectedValueOnce(new Error("initialization failed"));
+  // CI smoke (PR #7): Stockfish's handshake timed out while the scene loaded; the human's move
+  // cleared the error and the AI never moved again, with no retry button left. The AI's turn now
+  // retries initialization once.
+  it("retries a failed initialization when the AI's turn comes, then plays", async () => {
+    const { store, engine, requests } = setup();
+    vi.mocked(engine.newGame).mockRejectedValueOnce(new Error("Engine timed out"));
     store.getState().startGame(ai);
     await flush();
-    expect(store.getState().lastError).toBe("initialization failed");
+    expect(store.getState().lastError).toBe("Engine timed out");
     store.getState().submitCommand("e4");
     store.getState().animationDone();
     await flush();
+    expect(engine.newGame).toHaveBeenCalledTimes(2);
+    expect(store.getState().aiThinking).toBe(true);
+    requests[0]!.resolve("e7e5");
+    await flush();
+    expect(store.getState().animationQueue[0]?.uci).toBe("e7e5");
+    expect(store.getState().lastError).toBeNull();
+  });
+
+  it("reports a second initialization failure, releasing the lock so the player can retry", async () => {
+    const { store, engine } = setup();
+    vi.mocked(engine.newGame).mockRejectedValueOnce(new Error("Engine timed out")).mockRejectedValueOnce(new Error("Engine timed out"));
+    store.getState().startGame(ai);
+    await flush();
+    store.getState().submitCommand("e4");
+    store.getState().animationDone();
+    await flush();
+    expect(engine.newGame).toHaveBeenCalledTimes(2);
     expect(store.getState().aiThinking).toBe(false);
+    expect(store.getState().lastError).toBe("Engine timed out");
     expect(engine.bestMove).not.toHaveBeenCalled();
   });
 
