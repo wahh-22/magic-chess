@@ -7,9 +7,26 @@
     <link rel="preload" href="/fonts/cinzel-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/cormorant-garamond-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
     <title>Magic Chess</title>
+    <!-- First paint, before any script: the same branded loading screen React takes over. -->
+    <style>
+      @font-face { font-family: "Cinzel"; src: url("/fonts/cinzel-latin-wght.woff2") format("woff2"); font-weight: 400 900; font-display: swap; }
+      html, body { margin: 0; height: 100%; background: #0b0b0f; }
+      .boot-splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: radial-gradient(ellipse at 50% 40%, rgb(210 174 99 / 8%), transparent 58%), radial-gradient(ellipse at center, #17151b 0%, #0b0b0f 72%);
+        color: #f0d9a0; font-family: "Cinzel", Georgia, serif; }
+      .boot-splash h1 { margin: 0; font-size: 2.4rem; font-weight: 600; letter-spacing: 0.12em; }
+      .boot-splash .bar { position: relative; overflow: hidden; width: min(26rem, calc(100vw - 3rem)); height: 6px; margin-top: 1.6rem;
+        border: 1px solid rgb(210 174 99 / 55%); border-radius: 3px; background: rgb(10 9 12 / 85%); }
+      .boot-splash .bar::after { content: ""; position: absolute; inset: 0; width: 30%;
+        background: linear-gradient(90deg, transparent, rgb(255 240 200 / 38%), transparent); animation: boot-glint 1.6s linear infinite; }
+      @keyframes boot-glint { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+      @media (prefers-reduced-motion: reduce) { .boot-splash .bar::after { animation: none; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-splash" role="progressbar" aria-label="Loading Magic Chess"><h1>Magic Chess</h1><div class="bar"></div></div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

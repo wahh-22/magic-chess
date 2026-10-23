@@ -954,9 +954,123 @@ input {
   }
 }
 
+/* ——— Loading ——— */
+
+/* Over the canvas, under the setup menu: the menu stays usable while the bar fills. */
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgb(210 174 99 / 8%), transparent 58%),
+    radial-gradient(ellipse at center, #17151b 0%, #0b0b0f 72%);
+  transition: opacity 0.8s ease;
+}
+
+.loading-screen.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-title {
+  text-align: center;
+}
+
+.loading-title h1 {
+  margin: 0;
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+.loading-meter {
+  position: absolute;
+  left: 50%;
+  bottom: 1.6rem;
+  width: min(26rem, calc(100vw - 3rem));
+  transform: translateX(-50%);
+}
+
+.loading-screen.is-full .loading-meter {
+  position: static;
+  margin-top: 1.6rem;
+  transform: none;
+}
+
+.loading-meter.is-floating {
+  position: fixed;
+  z-index: 6;
+  pointer-events: none;
+  transition: opacity 0.8s ease;
+}
+
+.loading-meter.is-floating.is-leaving {
+  opacity: 0;
+}
+
+.loading-bar {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border: 1px solid var(--gold-line);
+  border-radius: 3px;
+  background: rgb(10 9 12 / 85%);
+  box-shadow: inset 0 0 0 1px rgb(10 9 12 / 90%), 0 0 1.2rem rgb(210 174 99 / 12%);
+}
+
+/*
+ * No looping animation or transition on the bar: every composited frame competes with the
+ * scene's GPU work, and with software GL (one shared CPU-bound GPU process) a looping glint
+ * starves the loading itself. The bar steps a few times per second instead.
+ */
+.loading-bar-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  background: linear-gradient(90deg, #7a5c22, var(--gold) 70%, var(--gold-bright));
+}
+
+.loading-screen.is-indeterminate .loading-bar-fill {
+  opacity: 0.35;
+}
+
+/* Behind the loading screen there is nothing to blur; a backdrop filter is costly to composite. */
+.app[data-loading] .setup-panel {
+  backdrop-filter: none;
+}
+
+.loading-caption {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.45rem;
+  color: var(--ivory-muted);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.loading-figures {
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hud-banner,
   .clock.low.running {
     animation: none;
+  }
+
+  .loading-screen,
+  .loading-meter.is-floating {
+    transition: none;
   }
 }

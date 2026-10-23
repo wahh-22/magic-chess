@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, useCallback, useEffect, useState } from "react";
+import { useStore } from "zustand";
 import { MuteToggle } from "../audio/MuteToggle";
 import { useGameSounds } from "../audio/useGameSounds";
 import type { MoveEvent } from "../core/types";
@@ -11,9 +12,10 @@ import { effectsStore } from "../scene/effects/effectsStore";
 import { ChessScene } from "../scene/ChessScene";
 import { QUALITY_KEY, readQuality, type GraphicsQuality } from "../scene/environment/battlefieldConfig";
 import { Pieces } from "../scene/Pieces";
-import { createProceduralPieceProvider } from "../scene/pieces/proceduralPieces";
-import { loadPieceModels } from "../scene/pieces/gltfPieces";
+import { preloadCriticalScene, usePieceModels, warmPass } from "../scene/sceneAssets";
+import { sceneLoader } from "../loading/assets";
 import { useGameStore } from "./gameStore";
+import { LoadingScreen } from "./LoadingScreen";
 import { PromotionPicker } from "./PromotionPicker";
 import { SetupScreen } from "./SetupScreen";
 import { GameActions, Hud } from "./Hud";
@@ -21,24 +23,44 @@ import { CreditsDialog } from "./CreditsDialog";
 import { SettingsMenu } from "./SettingsMenu";
 import { GameOverScreen } from "./GameOverScreen";
 
-// Physics (Rapier + its WASM) is only needed at the first capture, so it loads in the
-// background instead of delaying the first frame. Bursts wait in the effects store.
+// Physics (Rapier + its WASM) and capture effects are a separate chunk, loaded with the
+// critical set: its light and materials are part of the scene the warm-up prepares.
 const DestructionLayer = lazy(() =>
   import("../scene/effects/DestructionLayer").then((module) => ({ default: module.DestructionLayer })),
 );
 
+// Downloads, the environment worker and code chunks start before the first render.
+preloadCriticalScene(readQuality());
+
+/** Pieces and capture effects: they suspend the critical boundary until the models are ready. */
+function ScenePieces(props: Omit<Parameters<typeof Pieces>[0], "provider">) {
+  const models = usePieceModels();
+  return <>
+    <Pieces provider={models} {...props} />
+    <DestructionLayer pieces={props.pieces} activeEvent={props.activeEvent} provider={models} />
+  </>;
+}
+
 export function App() {
-  const [quality, setQuality] = useState(readQuality);
+  const [quality, setQualityState] = useState(readQuality);
+  const [warmRound, setWarmRound] = useState(0);
+  const setQuality = (next: GraphicsQuality) => {
+    if (next === quality) return;
+    // A new preset changes lights, shadows and post-processing: prepare it behind the loading screen.
+    sceneLoader.getState().rewarm();
+    setWarmRound((round) => round + 1);
+    setQualityState(next);
+  };
   useEffect(() => {
     try { localStorage.setItem(QUALITY_KEY, quality); }
     catch { /* Private browsing can disable storage; the session setting still works. */ }
   }, [quality]);
-  const [models, setModels] = useState(createProceduralPieceProvider);
-  useEffect(() => {
-    let active = true;
-    void loadPieceModels().then((provider) => { if (active) setModels(provider); });
-    return () => { active = false; };
-  }, []);
+  // The menu appears once the WebGL context exists, so it is responsive from its first frame.
+  const [glReady, setGlReady] = useState(false);
+  const onSceneCreated = useCallback(() => setGlReady(true), []);
+  const stage = useStore(sceneLoader, (state) => state.stage);
+  const startPending = useStore(sceneLoader, (state) => state.startPending);
+  const ready = stage === "ready";
   const pieces = useGameStore((state) => state.displayedPieces);
   const selected = useGameStore((state) => state.selected);
   const targets = useGameStore((state) => state.legalTargets);
@@ -76,8 +98,9 @@ export function App() {
   const closeCredits = useCallback(() => setCreditsOpen(false), []);
 
   return (
-    <div className="app">
-      <ChessScene quality={quality} paused={phase === "setup"}>
+    <div className="app" data-loading={ready ? undefined : ""}>
+      <ChessScene quality={quality} frameloop={!ready ? "never" : phase === "setup" ? "demand" : "always"}
+        secondary={ready || warmRound > 0} warmPass={warmPass(quality, warmRound)} onCreated={onSceneCreated}>
         <CinematicCamera shot={shot} enabled={cinematicEnabled} onShotEnd={() => setShot(null)} />
         <Board
           selected={selected}
@@ -85,19 +108,16 @@ export function App() {
           lastMove={lastUci ? { from: lastUci.slice(0, 2), to: lastUci.slice(2, 4) } : undefined}
           onSquareClick={selectSquare}
         />
-        <Pieces
-          provider={models}
+        <ScenePieces
           pieces={pieces}
           activeEvent={activeEvent}
           onAnimationDone={animationDone}
           onImpact={effectsStore.getState().addBurst}
           onPieceClick={selectSquare}
         />
-        <Suspense fallback={null}>
-          <DestructionLayer pieces={pieces} activeEvent={activeEvent} provider={models} />
-        </Suspense>
       </ChessScene>
-      {phase === "setup" ? <SetupScreen onCredits={openCredits} /> : <Hud />}
+      <LoadingScreen ready={ready} full={!glReady || phase !== "setup" || startPending || warmRound > 0} rewarm={warmRound > 0} />
+      {phase === "setup" ? glReady && !startPending && <SetupScreen onCredits={openCredits} /> : <Hud />}
       {phase === "over" && <GameOverScreen />}
       <PromotionPicker />
       <nav className="command-bar" aria-label="Game commands">

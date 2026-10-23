@@ -69,6 +69,8 @@ describe("glTF pieces (H4 S2, S6)", () => {
     const animations = [new AnimationClip("idle", 2, []), new AnimationClip("attack", 1, [])];
     const provider = await loadPieceModels({ fetch: fetchManifest({ version: 1, pieces: { p: rigEntry } }), load: async () => ({ scene: root, animations }) });
     expect(provider.parts?.('p', 'w')).toHaveLength(1);
+    // Split once on first use (destruction parts are not built while loading), then cached.
+    expect(provider.parts?.('p', 'w')).toBe(provider.parts?.('p', 'w'));
     expect(provider.parts?.('p', 'w')?.[0]?.materials[0]).toBe(mesh.material);
     expect(provider.rig?.("p")?.scene).toBe(root);
     expect(provider.rig?.("p")?.hitTimeMs).toBe(400);

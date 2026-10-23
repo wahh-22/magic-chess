@@ -1,36 +1,28 @@
-import { useTexture } from "@react-three/drei";
 import { lazy, useEffect, useMemo, Suspense } from "react";
 import { Object3D, RepeatWrapping, SRGBColorSpace, type Texture } from "three";
+import { useTextures } from "../../loading/assets";
 import { QUALITY_PRESETS, SUN_LIGHT_ELEVATION_DEG, sunDirection, type GraphicsQuality } from "./battlefieldConfig";
 import { DustMotes } from "./DustMotes";
+import { useEnvironmentGeometry } from "./environmentData";
 import { installHeightFog } from "./heightFog";
-import { buildPlaza, buildPlazaEdge, buildTerrain } from "./landscape";
-import { buildRuins, ruinFootprints } from "./ruins";
-import { placementFootprints, scatterLayout } from "./scatterLayout";
 import { Sky } from "./Sky";
-import { useStone } from "./stoneMaterials";
+import { stoneMapUrls, useStone } from "./stoneMaterials";
 import { createTerrainMaterial } from "./terrainMaterial";
 import { createTriplanarStone } from "./triplanar";
 
 installHeightFog();
 
-// The scanned props are the heaviest part of the scene: their code and GLBs load lazily,
-// behind the setup menu, while the plaza, ruins and sky are already on screen.
+// The scanned props are the heaviest part of the scene: they stream in after the critical
+// set (board, pieces, sky, ground) is on screen, and fade in without blocking input.
 const ScannedNature = lazy(() => import("./ScannedNature").then((module) => ({ default: module.ScannedNature })));
 
 const PAVERS = { roughness: 0.9, envMapIntensity: 0.5, vertexColors: true } as const;
 const SUN_DISTANCE = 45;
 const SHADOW_EXTENT = 15;
 
-function useDisposable<T extends { dispose: () => void }>(build: () => T): T {
-  const value = useMemo(() => build(), [build]);
-  useEffect(() => () => value.dispose(), [value]);
-  return value;
-}
-
 /** Tiling maps (diffuse sRGB, OpenGL normal, roughness) cloned so cached sources stay untouched. */
 function useMaps(asset: string) {
-  const sources = useTexture([`/environment/${asset}_diff.webp`, `/environment/${asset}_nor_gl.webp`, `/environment/${asset}_rough.webp`]);
+  const sources = useTextures(stoneMapUrls(asset));
   const maps = useMemo(() => {
     const [map, normalMap, roughnessMap] = sources.map((source, index) => {
       const texture = source.clone();
@@ -46,9 +38,6 @@ function useMaps(asset: string) {
   return maps;
 }
 
-/** Terrain with worn soil around every ruin and scattered solid (the layout is quality-independent for solids). */
-const buildGround = () => buildTerrain([...ruinFootprints(), ...placementFootprints(scatterLayout({ grassCount: 0, pebbleCount: 0, lodBias: 1, propDensity: 1 }))]);
-
 function Ground() {
   const pavers = useStone("floor_tiles_04", 1, 1, "#d9cdb8", false, PAVERS);
   const grass = useMaps("aerial_grass_rock");
@@ -58,10 +47,8 @@ function Ground() {
   const ruinsStone = useMemo(() => createTriplanarStone(rock, 0.8, 0.45, { envMapIntensity: 0.6 }), [rock]);
   const ground = useMemo(() => createTerrainMaterial({ ...grass, tile: 5 }, { ...dirt, tile: 3.2 }, { ...gravel, tile: 2.4 }), [grass, dirt, gravel]);
   useEffect(() => () => { ruinsStone.dispose(); ground.dispose(); }, [ruinsStone, ground]);
-  const ruins = useDisposable(buildRuins);
-  const terrain = useDisposable(buildGround);
-  const plaza = useDisposable(buildPlaza);
-  const plazaEdge = useDisposable(buildPlazaEdge);
+  // Built in a worker (environment.worker.ts); kept for the whole session.
+  const { ruins, terrain, plaza, plazaEdge } = useEnvironmentGeometry();
   return <group>
     <mesh geometry={terrain} material={ground} receiveShadow />
     <mesh geometry={plaza} material={pavers} receiveShadow />
@@ -94,15 +81,19 @@ function Sun({ quality }: { quality: GraphicsQuality }) {
  * (ambient + reflections); a warm low sun aligned with the sky's sun casts long shadows;
  * height fog settles in the valleys and glows toward the sun.
  */
-export function Battlefield({ quality }: { quality: GraphicsQuality }) {
+export function Battlefield({ quality, secondary = true }: {
+  quality: GraphicsQuality;
+  /** Stream the scanned nature in (after the critical set is revealed). */
+  secondary?: boolean;
+}) {
   const preset = QUALITY_PRESETS[quality];
-  const placements = useMemo(() => scatterLayout(preset), [preset]);
+  // Sky and ground suspend the caller's boundary: they are part of the critical set.
   return <>
     <fogExp2 attach="fog" args={["#cdb79a", 0.0036]} />
-    <Suspense fallback={null}><Sky intensity={1} environmentIntensity={1} /></Suspense>
+    <Sky intensity={1} environmentIntensity={1} />
     <Sun quality={quality} />
-    <Suspense fallback={null}><Ground /></Suspense>
-    <Suspense fallback={null}><ScannedNature placements={placements} /></Suspense>
+    <Ground />
+    {secondary && <Suspense fallback={null}><ScannedNature quality={quality} /></Suspense>}
     <DustMotes count={preset.dustCount} />
   </>;
 }

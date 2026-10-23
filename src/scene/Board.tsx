@@ -153,6 +153,11 @@ export function Board({ onSquareClick, selected, targets = [], lastMove }: Board
         <SquareMarker key={target.to} square={target.to} capture={target.isCapture} texture={glows}
           color={target.isCapture ? ARCANA.gold : ARCANA.cyan} onSquareClick={onSquareClick} />
       ))}
+      {/* Never drawn: lets the loading warm-up link the marker programs before the first click. */}
+      <group visible={false} name="marker-warmup">
+        <SquareMarker square="a1" capture texture={glows} color={ARCANA.gold} inert />
+        <SquareMarker square="a1" capture={false} texture={glows} color={ARCANA.cyan} inert />
+      </group>
     </group>
   );
 }
@@ -170,19 +175,21 @@ function Glow({ square, texture, color, size, opacity, lift = 0.004 }: {
   );
 }
 
-function SquareMarker({ square, capture, texture, color, onSquareClick }: {
+function SquareMarker({ square, capture, texture, color, onSquareClick, inert = false }: {
   square: Square;
   capture: boolean;
   texture: { ring: CanvasTexture; spot: CanvasTexture };
   color: string;
   onSquareClick?: (square: Square) => void;
+  /** No pointer handling (warm-up copy). */
+  inert?: boolean;
 }) {
   const [x, z] = squareToWorld(square);
   return (
     <group>
       {/* A soft shade under the light keeps it legible on the pale slabs in full sun. */}
       <mesh position={[x, 0.003, z]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}
-        onClick={(event) => { event.stopPropagation(); onSquareClick?.(square); }}>
+        {...(inert ? { raycast: () => {} } : { onClick: (event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onSquareClick?.(square); } })}>
         <planeGeometry args={capture ? [0.98, 0.98] : [0.5, 0.5]} />
         <meshBasicMaterial map={capture ? texture.ring : texture.spot} color="#0b1218" transparent opacity={capture ? 0.35 : 0.45} depthWrite={false} toneMapped={false} />
       </mesh>
