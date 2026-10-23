@@ -2,9 +2,10 @@ import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { Camera, Vector3 } from "three";
 import {
-  blendCameraPose, cinematicDuration, sampleCinematicShot,
+  blendCameraPose, cinematicDuration, constrainScenePose, sampleCinematicShot,
   type CameraPose, type CinematicShot,
 } from "./cinematicShots";
+import { cinematicFocus, focusAmount } from "./cinematicFocus";
 
 // Structural subset keeps this component independent of drei's implementation type.
 interface OrbitHandle {
@@ -33,8 +34,12 @@ function applyPose(camera: Camera, controls: OrbitHandle, pose: CameraPose) {
   controls.target.fromArray(pose.target);
   camera.lookAt(controls.target);
   controls.update();
+  // Controls may enforce their cinematic minimum radius; world bounds take precedence.
+  camera.position.fromArray(constrainScenePose(readPose(camera, controls)).position);
+  camera.lookAt(controls.target);
 }
 function restore(camera: Camera, session: Session) {
+  cinematicFocus.amount = 0;
   applyPose(camera, session.controls, session.original);
   Object.assign(session.controls, session.settings);
 }
@@ -110,15 +115,18 @@ export function CinematicCamera({ shot, enabled, onShotEnd }: CinematicCameraPro
     if (!active) return;
     let done: boolean;
     let pose: CameraPose;
+    const { approachMs, holdMs, returnMs } = active.shot.config;
     if (active.skip) {
       active.skip.elapsedMs += delta * 1000;
-      done = active.skip.elapsedMs >= active.shot.config.returnMs;
-      pose = blendCameraPose(active.skip.from, active.original,
-        active.skip.elapsedMs / active.shot.config.returnMs);
+      done = active.skip.elapsedMs >= returnMs;
+      pose = blendCameraPose(active.skip.from, active.original, active.skip.elapsedMs / returnMs);
+      cinematicFocus.amount = Math.min(cinematicFocus.amount, 1 - active.skip.elapsedMs / returnMs);
     } else {
       active.elapsedMs += delta * 1000;
       done = active.elapsedMs >= cinematicDuration(active.shot);
       pose = sampleCinematicShot(active.shot, active.original, active.elapsedMs);
+      cinematicFocus.amount = focusAmount(active.elapsedMs, approachMs, holdMs, returnMs);
+      cinematicFocus.target = active.shot.pose.target;
     }
     applyPose(camera, active.controls, pose);
     if (done) {

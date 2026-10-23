@@ -9,7 +9,7 @@ import { planCinematicShot, qualifiesForCinematic, type CinematicShot } from "..
 import { CinematicToggle, readCinematicEnabled } from "../scene/camera/CinematicToggle";
 import { effectsStore } from "../scene/effects/effectsStore";
 import { ChessScene } from "../scene/ChessScene";
-import { QUALITY_KEY, readQuality, type GraphicsQuality } from "../scene/environment/chamberConfig";
+import { QUALITY_KEY, readQuality, type GraphicsQuality } from "../scene/environment/battlefieldConfig";
 import { Pieces } from "../scene/Pieces";
 import { createProceduralPieceProvider } from "../scene/pieces/proceduralPieces";
 import { loadPieceModels } from "../scene/pieces/gltfPieces";
