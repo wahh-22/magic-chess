@@ -121,7 +121,7 @@ export function createGameStore(deps: { createEngine: () => Engine; now?: () => 
       }
     };
 
-    const requestAiMove = async (retryInitialization = false) => {
+    const requestAiMove = async () => {
       const state = get();
       if (state.phase !== "playing" || isHumanTurn(state) || state.aiThinking || state.animationQueue.length) return;
       const id = state.gameId;
@@ -130,7 +130,9 @@ export function createGameStore(deps: { createEngine: () => Engine; now?: () => 
       try {
         let initialized = await ready;
         if (get().gameId !== id) return;
-        if (!initialized && retryInitialization) {
+        // A failed start (e.g. the handshake timing out while the scene loads) is retried
+        // when the AI's turn comes; a second failure is reported and can be retried by hand.
+        if (!initialized) {
           initializeEngine(id);
           initialized = await engineReady;
           if (get().gameId !== id) return;
@@ -289,7 +291,7 @@ export function createGameStore(deps: { createEngine: () => Engine; now?: () => 
         if (!state.lastError || state.phase !== "playing" || isHumanTurn(state) ||
             state.aiThinking || state.animationQueue.length) return;
         set({ lastError: null });
-        void requestAiMove(true);
+        void requestAiMove();
       },
 
       backToSetup() {

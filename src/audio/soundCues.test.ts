@@ -20,11 +20,12 @@ describe("stone sound cues", () => {
     ]);
   });
 
-  it("lands a knight hop without scraping through the air", () => {
+  it("slides a knight along its L like every other piece", () => {
     const event = move(new GameState(), "g1", "f3");
     const plan = planMove(event);
-    expect(cuesForMove(event, plan)).toEqual([
-      { cue: "set-down", atMs: plan.tracks[0]!.durationMs, pan: 0.3 },
+    expect(cuesForMove(event, plan).map(({ cue, atMs }) => ({ cue, atMs }))).toEqual([
+      { cue: "slide", atMs: 0 },
+      { cue: "set-down", atMs: plan.tracks[0]!.durationMs },
     ]);
   });
 

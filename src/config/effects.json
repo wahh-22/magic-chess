@@ -1,4 +1,5 @@
 {
+  "rigidParts": { "high": 40, "low": 12 },
   "debris": {
     "impulseStrength": 0.8,
     "upwardBias": 1.15,

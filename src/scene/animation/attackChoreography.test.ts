@@ -14,7 +14,7 @@ describe("rigid attack choreography", () => {
     expect(attack.strikeMs).toBe(plan.impact!.atMs);
     expect(attack.strikeMs).toBeLessThanOrEqual(plan.tracks[0]!.durationMs);
     const windup = sampleAttack(attack, attack.windupMs);
-    expect(windup.height).toBeGreaterThan(0);
+    expect(windup.height).toBe(0);
     if (type !== "r") expect(windup.pitch).toBeLessThan(0);
     const strike = sampleAttack(attack, attack.strikeMs);
     expect(strike.height).toBe(0);
@@ -28,7 +28,7 @@ describe("rigid attack choreography", () => {
     }
   });
 
-  it("does not penetrate the contact proxies before the strike; knight hop lands at the strike", () => {
+  it("does not penetrate the contact proxies before the strike; the attacker stays grounded", () => {
     const plan = planMove(event, config, 0.6, "n");
     const attack = plan.attack!;
     for (let time = 0; time < attack.strikeMs; time += 5) {

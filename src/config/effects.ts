@@ -33,6 +33,8 @@ export interface DebrisConfig {
 }
 
 export interface EffectsConfig {
+  /** Hard per-capture rigid armor budgets; low quality merges nearby bones. */
+  rigidParts: { high: number; low: number };
   dust: DustConfig;
   debris: DebrisConfig;
 }

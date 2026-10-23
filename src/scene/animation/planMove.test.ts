@@ -48,8 +48,10 @@ describe("planMove", () => {
   });
 
   it.each([["b1", "c3"], ["b1", "d2"], ["d4", "c2"], ["d4", "b3"]])(
-    "detects the knight L-shape from %s to %s", (from, to) => {
-      expect(planMove(move({ from, to })).tracks[0]?.kind).toBe("hop");
+    "slides the knight L-shape from %s to %s through its corner", (from, to) => {
+      const track = planMove(move({ from, to })).tracks[0];
+      expect(track?.kind).toBe("glide");
+      expect(track?.via).toBeDefined();
     },
   );
 
