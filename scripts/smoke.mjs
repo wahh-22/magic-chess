@@ -64,8 +64,11 @@ async function expectState(step, predicate, timeout = 5000) {
 await page.goto(url);
 await expectState("setup screen opens", () => globalThis.__gameStore?.getState().phase === "setup");
 await page.screenshot({ path: `${shots}/smoke-setup.png` });
-await page.getByRole("button", { name: "Start game" }).click();
-await expectState("game starts", () => globalThis.__gameStore?.getState().phase === "playing");
+const startButton = page.getByRole("button", { name: "Start game" });
+await startButton.waitFor({ timeout: 60000 * TIMEOUT_SCALE });
+await startButton.click();
+// Pressed early, the game waits behind the loading screen until the critical set is ready.
+await expectState("game starts", () => globalThis.__gameStore?.getState().phase === "playing", 60000);
 // A few frames are enough: clicks are projected with the live camera, not fixed pixels.
 await expectState("scene renders", () => (globalThis.__frames ?? 0) > 5, 15000);
 

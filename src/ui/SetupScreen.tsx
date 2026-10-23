@@ -4,6 +4,10 @@ import { DIFFICULTIES } from "../core/engine/difficulty";
 import type { GameSettings } from "./gameStore";
 import { useGameStore } from "./gameStore";
 import { Emblem } from "./Heraldry";
+import { sceneLoader } from "../loading/assets";
+
+/** Starts now if the scene is ready; otherwise the game waits behind the loading screen. */
+const whenReady = (action: () => void) => { sceneLoader.getState().requestStart(action); };
 
 export function SetupScreen({ onCredits }: { onCredits: () => void }) {
   const startGame = useGameStore((state) => state.startGame);
@@ -20,12 +24,13 @@ export function SetupScreen({ onCredits }: { onCredits: () => void }) {
     <div className="setup-backdrop">
       <form className="arcana-panel setup-panel" onSubmit={(event) => {
         event.preventDefault();
-        startGame({ mode, timeControl, humanColor: color === "random" ? (Math.random() < 0.5 ? "w" : "b") : color, difficultyId });
+        const settings: GameSettings = { mode, timeControl, humanColor: color === "random" ? (Math.random() < 0.5 ? "w" : "b") : color, difficultyId };
+        whenReady(() => startGame(settings));
       }}>
         <div className="setup-crest" aria-hidden="true"><Emblem color="w" size={28} /><Emblem color="b" size={28} /></div>
         <h1>Magic Chess</h1>
         <p className="setup-subtitle">Ivory against obsidian</p>
-        {hasSavedGame && <button type="button" className="continue-button" onClick={continueGame}>Continue game</button>}
+        {hasSavedGame && <button type="button" className="continue-button" onClick={() => whenReady(continueGame)}>Continue game</button>}
         <fieldset>
           <legend>Game mode</legend>
           <div className="mode-choices">
