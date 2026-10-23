@@ -1,7 +1,32 @@
-import { cloneDocument, copyToDocument, createDefaultPropertyResolver, joinPrimitives, compactPrimitive, unpartition } from '@gltf-transform/functions';
+import { cloneDocument, copyToDocument, createDefaultPropertyResolver, joinPrimitives, compactPrimitive, unpartition, prune, quantize, weld } from '@gltf-transform/functions';
 import { Matrix4, Vector3, Quaternion, Box3, BufferGeometry, BufferAttribute } from 'three';
 import { MeshoptSimplifier } from 'meshoptimizer';
 import { atlasMaterials } from './process.mjs';
+import { authorArcanaAttack } from './arcana-attacks.mjs';
+import { simplifyRigidParts } from './simplify-parts.mjs';
+import { detachSharedTextures } from './arcana-textures.mjs';
+import { appendPedestal, selectContractClips, selectV4Clips } from './arcana-v4.mjs';
+
+/** Shared materials need UVs only: exported tangents and baked vertex colors are never read. */
+function dropLibraryAttributes(document) {
+  detachSharedTextures(document);
+  for (const mesh of document.getRoot().listMeshes()) for (const primitive of mesh.listPrimitives()) {
+    primitive.setAttribute('TANGENT', null).setAttribute('COLOR_0', null);
+  }
+}
+
+/** Set animated bones' rest TRS to the idle clip's first key; inverse bind matrices stay. */
+function restInClip(document, name) {
+  const animation = document.getRoot().listAnimations().find(a => a.getName() === name || a.getName().endsWith(`__${name}`));
+  if (!animation) throw new Error(`Missing idle clip ${name}`);
+  for (const channel of animation.listChannels()) {
+    const sampler = channel.getSampler(), path = channel.getTargetPath();
+    const value = sampler.getOutput().getElement(sampler.getInterpolation() === 'CUBICSPLINE' ? 1 : 0, []);
+    if (path === 'rotation') channel.getTargetNode().setRotation(value);
+    else if (path === 'translation') channel.getTargetNode().setTranslation(value);
+    else if (path === 'scale') channel.getTargetNode().setScale(value);
+  }
+}
 
 function namedNodes(doc) {
   const map = new Map();
@@ -128,8 +153,17 @@ export async function processRigged(sources, options, settings, warn = console.w
     }
   }
   const materials = [...new Set(primitives.map((p) => p.getMaterial()))];
-  const atlas = await atlasMaterials(document, materials, options.textureSize);
-  for (const p of primitives) {
+  if (settings.materials !== undefined && !['preserve', 'atlas', 'shared'].includes(settings.materials)) throw new Error('Unknown rigged materials mode');
+  const shared = settings.materials === 'shared';
+  const preserve = settings.materials === 'preserve' || shared;
+  if (shared) {
+    dropLibraryAttributes(document);
+    // Tangent/color splits made most source vertices unique; weld before simplifying.
+    await document.transform(weld());
+  }
+  const atlas = preserve ? null : await atlasMaterials(document, materials, options.textureSize);
+  if (preserve && root.listTextures().length) throw new Error('Preserved materials must be texture-free');
+  for (const p of preserve ? [] : primitives) {
     // A source may share an accessor across material primitives; remap each once.
     const sourceUV = p.getAttribute('TEXCOORD_0');
     const uv = document.createAccessor().setType('VEC2').setBuffer(root.listBuffers()[0]).setArray(sourceUV ? new Float32Array(sourceUV.getArray()) : new Float32Array(p.getAttribute('POSITION').getCount() * 2).fill(0.5));
@@ -141,46 +175,71 @@ export async function processRigged(sources, options, settings, warn = console.w
     p.setAttribute('TEXCOORD_0', uv).setMaterial(atlas.material);
   }
   const trianglesBefore = primitives.reduce((sum, p) => sum + (p.getIndices()?.getCount() ?? p.getAttribute('POSITION').getCount()) / 3, 0);
-  const joined = joinPrimitives(primitives);
-  node.setMesh(document.createMesh('rigged-piece').addPrimitive(joined));
+  const outputPrimitives = shared ? await simplifyRigidParts(document, primitives, options.maxTriangles) : preserve ? materials.map((material) => joinPrimitives(primitives.filter((p) => p.getMaterial() === material))) : [joinPrimitives(primitives)];
+  const mesh = document.createMesh('rigged-piece');
+  for (const p of outputPrimitives) mesh.addPrimitive(p);
+  node.setMesh(mesh);
   for (const other of nodes.slice(1)) other.setMesh(null).setSkin(null);
-  if (trianglesBefore > options.maxTriangles) {
-    await MeshoptSimplifier.ready;
-    const count = joined.getAttribute('POSITION').getCount();
-    const attrs = new Float32Array(count * 10);
-    for (let i = 0; i < count; i++) attrs.set([...joined.getAttribute('TEXCOORD_0').getElement(i, []), ...joined.getAttribute('JOINTS_0').getElement(i, []), ...joined.getAttribute('WEIGHTS_0').getElement(i, [])], i * 10);
-    const [indices] = MeshoptSimplifier.simplifyWithAttributes(joined.getIndices().getArray(), joined.getAttribute('POSITION').getArray(), 3, attrs, 10, [1, 1, 10, 10, 10, 10, 10, 10, 10, 10], null, options.maxTriangles * 3, 1, ['Permissive']);
-    if (!indices.length || indices.length / 3 > options.maxTriangles) throw new Error('Cannot meet rigged triangle budget');
-    joined.getIndices().setArray(indices);
+  for (const joined of outputPrimitives) {
+    if (!shared && trianglesBefore > options.maxTriangles) {
+      await MeshoptSimplifier.ready;
+      const count = joined.getAttribute('POSITION').getCount();
+      const attrs = new Float32Array(count * 10);
+      for (let i = 0; i < count; i++) attrs.set([...(joined.getAttribute('TEXCOORD_0')?.getElement(i, []) ?? [0, 0]), ...joined.getAttribute('JOINTS_0').getElement(i, []), ...joined.getAttribute('WEIGHTS_0').getElement(i, [])], i * 10);
+      const target = Math.floor(options.maxTriangles * joined.getIndices().getCount() / (trianglesBefore * 3)) * 3;
+      const [indices] = MeshoptSimplifier.simplifyWithAttributes(joined.getIndices().getArray(), joined.getAttribute('POSITION').getArray(), 3, attrs, 10, [1, 1, 10, 10, 10, 10, 10, 10, 10, 10], null, target, 1, ['Permissive']);
+      if (!indices.length || indices.length > target) throw new Error('Cannot meet rigged triangle budget');
+      joined.getIndices().setArray(indices);
+    }
+    compactPrimitive(joined);
   }
-  compactPrimitive(joined);
   // Keep every animated local TRS and inverse bind matrix untouched. The common
   // normalization parent changes mesh and joints together, so skinning commutes.
+  if (settings.pedestal) {
+    await appendPedestal(document, settings.pedestal);
+    if (shared) dropLibraryAttributes(document);
+  }
+  // V6–V8 rest poses hold weapons straight forward, a pose never shown. Rest in the
+  // guard instead: normalization, colliders and debris then match the looping idle.
+  if (settings.contract) restInClip(document, settings.contract(1).selectors.idle);
+  const visibleNodes = root.listNodes().filter(n => n.getMesh());
   const scene = root.getDefaultScene() ?? root.listScenes()[0];
   const wrapper = document.createNode('piece-normalization').setRotation([0, Math.sin(options.rotationYDegrees * Math.PI / 360), 0, Math.cos(options.rotationYDegrees * Math.PI / 360)]);
   for (const child of scene.listChildren()) wrapper.addChild(child);
   scene.addChild(wrapper);
-  let box = bindBounds([node]);
+  let box = bindBounds(visibleNodes);
   const size = box.getSize(new Vector3());
   if (!(size.y > 0) || !Number.isFinite(size.length())) throw new Error('Invalid rigged bind bounds');
   const scale = Math.min(options.height / size.y, options.maxFootprint / Math.max(size.x, size.z));
   wrapper.setScale([scale, scale, scale]).setTranslation([-(box.min.x + box.max.x) / 2 * scale, -box.min.y * scale, -(box.min.z + box.max.z) / 2 * scale]);
-  box = bindBounds([node]);
-  const clips = {};
-  for (const role of ['idle', 'attack']) {
-    const selector = settings.clips?.[role];
+  box = bindBounds(visibleNodes);
+  const authored = settings.arcanaAttack ? authorArcanaAttack(document, settings.arcanaAttack) : undefined;
+  // V6–V8 lance thrusts are too fast for fixed 30 Hz decimation: drop keys by error only.
+  // Resampling compares neighbours greedily, so a slow drift needs the strict tolerance.
+  const v4 = settings.contract ? await selectContractClips(document, settings.contract(scale), { decimate: false })
+    : settings.integration ? await selectV4Clips(document, settings.integration, settings.type, scale) : undefined;
+  const clips = v4?.clips ?? {};
+  const selected = new Set(v4 ? root.listAnimations() : []);
+  for (const role of v4 ? [] : ['idle', 'attack']) {
+    const selector = role === 'attack' && authored ? 'attack' : settings.clips?.[role];
     if (selector === undefined || selector === null) continue;
     const animation = typeof selector === 'number' ? root.listAnimations()[selector] : root.listAnimations().find((a) => a.getName() === selector);
     if (!animation) throw new Error(`Missing ${role} clip: ${selector}`);
-    animation.setName(role); clips[role] = role;
+    animation.setName(role); clips[role] = role; selected.add(animation);
   }
+  for (const animation of root.listAnimations()) if (!selected.has(animation)) animation.dispose();
   const attack = root.listAnimations().find((a) => a.getName() === clips.attack);
   const clipDurationMs = attack ? duration(attack) : 0;
-  const hitTimeMs = attack ? settings.hitTimeMs ?? detectHitTime(document, attack, warn) : 0;
+  const hitTimeMs = attack ? v4?.attacks[0].hitMs ?? authored?.hitTimeMs ?? settings.hitTimeMs ?? detectHitTime(document, attack, warn) : 0;
   if (!Number.isFinite(hitTimeMs) || hitTimeMs < 0 || hitTimeMs > clipDurationMs) throw new Error('hitTimeMs must be within the attack clip');
   // Remove replaced mesh/material resources without pruning animated bones.
-  for (const mesh of root.listMeshes()) if (mesh !== node.getMesh()) mesh.dispose();
-  for (const mat of root.listMaterials()) if (mat !== atlas.material) mat.dispose();
+  for (const mesh of root.listMeshes()) if (!visibleNodes.some(n => n.getMesh() === mesh)) mesh.dispose();
+  for (const mat of root.listMaterials()) if (!preserve && mat !== atlas.material) mat.dispose();
+  // Library materials carry the textures: keep their UVs although pieces hold none.
+  await document.transform(prune({ keepLeaves: true, keepAttributes: shared }));
+  // Tiled library UVs leave [0, 1] and stay float; never quantize just the in-range few,
+  // or the runtime bind bake cannot merge primitives with mixed UV array types.
+  if (preserve) await document.transform(quantize({ quantizePosition: 14, quantizeNormal: 10, quantizeWeight: 8, ...(shared ? { pattern: /^(?!TEXCOORD_)/ } : {}) }));
   await document.transform(unpartition());
-  return { document, trianglesBefore, entry: { skinned: true, clips, hitTimeMs, clipDurationMs, height: box.max.y - box.min.y, footprint: Math.max(box.max.x - box.min.x, box.max.z - box.min.z), triangles: joined.getIndices().getCount() / 3, fragmentColor: '#' + [0, 1, 2].map((c) => Math.round(atlas.averages.reduce((sum, color) => sum + color[c], 0) / atlas.averages.length).toString(16).padStart(2, '0')).join('') } };
+  return { document, trianglesBefore, entry: { skinned: true, clips, ...(v4 ? { rig: v4 } : {}), hitTimeMs, clipDurationMs, height: box.max.y - box.min.y, footprint: Math.max(box.max.x - box.min.x, box.max.z - box.min.z), triangles: visibleNodes.flatMap(n => n.getMesh().listPrimitives()).reduce((sum, p) => sum + (p.getIndices()?.getCount() ?? p.getAttribute('POSITION').getCount()) / 3, 0), fragmentColor: '#' + [0, 1, 2].map((c) => Math.round(preserve ? materials.reduce((sum, m) => sum + (m?.getBaseColorFactor()[c] ?? 1) * 255, 0) / materials.length : atlas.averages.reduce((sum, color) => sum + color[c], 0) / atlas.averages.length).toString(16).padStart(2, '0')).join('') } };
 }
