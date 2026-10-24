@@ -1,5 +1,6 @@
-// Browser smoke test against the running dev server: real mouse clicks, move
-// animation, and a real Stockfish reply. Usage: node scripts/smoke.mjs [url]
+// Browser smoke test against the running dev server: the title menu (no scene), match setup,
+// loading and reveal, real mouse clicks, move animation, and a real Stockfish reply.
+// Usage: node scripts/smoke.mjs [url]
 import { mkdirSync } from "node:fs";
 import { chromium } from "playwright";
 
@@ -26,6 +27,7 @@ const state = () =>
   page.evaluate(() => {
     const s = globalThis.__gameStore.getState();
     return {
+      screen: document.querySelector(".app")?.dataset.screen,
       phase: s.phase,
       selected: s.selected,
       targets: s.legalTargets.map((m) => m.to),
@@ -61,16 +63,34 @@ async function expectState(step, predicate, timeout = 5000) {
   }
 }
 
-// Regression guard for the loading work (docs/performance.md): the menu must stay responsive
-// while the scene loads, so pressing "Start game" as soon as it shows returns quickly. The
-// budget is generous (a busy main thread used to delay this click by 4–5 s).
+// The title menu is a page of its own (no canvas, no WebGL): it must show quickly.
+const TITLE_BUDGET_MS = 2500 * TIMEOUT_SCALE;
+// Regression guard for the loading work (docs/performance.md): the menu must stay responsive,
+// so pressing "Start game" returns quickly (the loading screen takes over). The budget is
+// generous (a busy main thread used to delay this click by 4–5 s).
 const START_CLICK_BUDGET_MS = 1000 * TIMEOUT_SCALE;
+const noCanvas = () => page.evaluate(() => document.querySelector("canvas") === null);
 
-await page.goto(url);
-await expectState("setup screen opens", () => globalThis.__gameStore?.getState().phase === "setup");
-await page.screenshot({ path: `${shots}/smoke-setup.png` });
+const openedAt = Date.now();
+await page.goto(url, { waitUntil: "commit" });
+const playVsEngine = page.getByRole("button", { name: "Play vs Engine" });
+await playVsEngine.waitFor({ timeout: 60000 * TIMEOUT_SCALE });
+const titleMs = Date.now() - openedAt;
+const titleFast = titleMs <= TITLE_BUDGET_MS;
+console.log(`${titleFast ? "PASS" : "FAIL"} title menu visible in ${titleMs} ms (budget ${TITLE_BUDGET_MS} ms)`);
+await expectState("title shows no scene (no canvas)", () => document.querySelector("canvas") === null &&
+  globalThis.__gameStore?.getState().phase === "setup");
+await page.screenshot({ path: `${shots}/smoke-title.png` });
+await playVsEngine.click();
 const startButton = page.getByRole("button", { name: "Start game" });
-await startButton.waitFor({ timeout: 60000 * TIMEOUT_SCALE });
+await startButton.waitFor({ timeout: 10000 * TIMEOUT_SCALE });
+const setupWithoutCanvas = await noCanvas();
+console.log(`${setupWithoutCanvas ? "PASS" : "FAIL"} match setup shows no scene (no canvas)`);
+await page.screenshot({ path: `${shots}/smoke-setup.png` });
+if (!titleFast || !setupWithoutCanvas) {
+  await browser.close();
+  process.exit(1);
+}
 const clickedAt = Date.now();
 await startButton.click();
 const startClickMs = Date.now() - clickedAt;
@@ -80,8 +100,10 @@ if (!responsive) {
   await browser.close();
   process.exit(1);
 }
-// Pressed early, the game waits behind the loading screen until the critical set is ready.
+// The match loads behind the loading screen; the game starts when it is ready, then the
+// camera arrives (skippable) and the HUD appears.
 await expectState("game starts", () => globalThis.__gameStore?.getState().phase === "playing", 60000);
+await expectState("reveal ends, HUD shows", () => document.querySelector(".app")?.dataset.screen === "playing", 15000);
 // A few frames are enough: clicks are projected with the live camera, not fixed pixels.
 await expectState("scene renders", () => (globalThis.__frames ?? 0) > 5, 15000);
 
@@ -114,7 +136,9 @@ await expectState(
 );
 await page.screenshot({ path: `${shots}/smoke-after-ai.png` });
 await page.getByRole("button", { name: "Menu", exact: true }).click();
-await expectState("Menu returns to setup", () => globalThis.__gameStore.getState().phase === "setup");
+await expectState("Menu returns to the title, the scene parked hidden", () =>
+  globalThis.__gameStore.getState().phase === "setup" && document.querySelector(".app")?.dataset.screen === "title" &&
+  getComputedStyle(document.querySelector(".match-stage")).visibility === "hidden");
 console.log("errors:", errors.length ? errors : "none");
 await browser.close();
 if (errors.length) process.exitCode = 1;

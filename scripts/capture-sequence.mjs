@@ -24,8 +24,10 @@ page.on("pageerror", (error) => errors.push(error.message));
 page.on("console", (message) => message.type() === "error" && errors.push(message.text()));
 
 await page.goto(url);
-await page.getByLabel("Two players on this computer").check();
-await page.getByRole("button", { name: "Start game" }).click();
+// Title menu → match setup; the match loads after "Start game" and is playable once revealed.
+await page.getByRole("button", { name: "Two Players", exact: true }).click();
+await page.getByRole("button", { name: "Start game", exact: true }).click();
+await page.waitForFunction(() => document.querySelector(".app")?.dataset.screen === "playing", undefined, { timeout: 300000 });
 await page.waitForFunction(() => (globalThis.__frames ?? 0) > 20, undefined, { timeout: 15000 });
 
 const idle = () => page.waitForFunction(() => globalThis.__gameStore.getState().animationQueue.length === 0, undefined, { timeout: 30000 });
