@@ -1,142 +1,147 @@
-import { lazy, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useStore } from "zustand";
-import { MuteToggle } from "../audio/MuteToggle";
-import { useGameSounds } from "../audio/useGameSounds";
-import type { MoveEvent } from "../core/types";
-import { planMove } from "../scene/animation/planMove";
-import { Board } from "../scene/Board";
-import { CinematicCamera } from "../scene/camera/CinematicCamera";
-import { planCinematicShot, qualifiesForCinematic, type CinematicShot } from "../scene/camera/cinematicShots";
-import { CinematicToggle, readCinematicEnabled } from "../scene/camera/CinematicToggle";
-import { effectsStore } from "../scene/effects/effectsStore";
-import { ChessScene } from "../scene/ChessScene";
+import { importPgn as parsePgn } from "../core/pgn";
+import { loadProgress, sceneLoader } from "../loading/state";
+import { readCinematicEnabled } from "../scene/camera/CinematicToggle";
 import { QUALITY_KEY, readQuality, type GraphicsQuality } from "../scene/environment/battlefieldConfig";
-import { Pieces } from "../scene/Pieces";
-import { preloadCriticalScene, usePieceModels, warmPass } from "../scene/sceneAssets";
-import { sceneLoader } from "../loading/assets";
-import { useGameStore } from "./gameStore";
-import { LoadingScreen } from "./LoadingScreen";
-import { PromotionPicker } from "./PromotionPicker";
-import { SetupScreen } from "./SetupScreen";
-import { GameActions, Hud } from "./Hud";
 import { CreditsDialog } from "./CreditsDialog";
-import { SettingsMenu } from "./SettingsMenu";
-import { GameOverScreen } from "./GameOverScreen";
+import { flowReducer, initialFlow, isMenuScreen, readyToReveal, SECONDARY_WAIT_MS, type EngineStatus } from "./flow";
+import { gameStore, useGameStore, type GameSettings } from "./gameStore";
+import { LoadingScreen } from "./LoadingScreen";
+import { loadingArtFor } from "./loadingTips";
+import { browserStorage, readSave } from "./persistence";
+import { TitleScreen } from "./TitleScreen";
 
-// Physics (Rapier + its WASM) and capture effects are a separate chunk, loaded with the
-// critical set: its light and materials are part of the scene the warm-up prepares.
-const DestructionLayer = lazy(() =>
-  import("../scene/effects/DestructionLayer").then((module) => ({ default: module.DestructionLayer })),
-);
+/** Everything three.js: fetched at Start, or while the title idles (code and bytes, no GPU work). */
+const loadMatch = () => import("./Match");
+const Match = lazy(() => loadMatch().then((module) => ({ default: module.Match })));
 
-// Downloads, the environment worker and code chunks start before the first render.
-preloadCriticalScene(readQuality());
-
-/** Pieces and capture effects: they suspend the critical boundary until the models are ready. */
-function ScenePieces(props: Omit<Parameters<typeof Pieces>[0], "provider">) {
-  const models = usePieceModels();
-  return <>
-    <Pieces provider={models} {...props} />
-    <DestructionLayer pieces={props.pieces} activeEvent={props.activeEvent} provider={models} />
-  </>;
+/** Runs `work` once the browser is idle after the title is shown. */
+function whenIdle(work: () => void): () => void {
+  if (typeof requestIdleCallback === "function") {
+    const handle = requestIdleCallback(work, { timeout: 4000 });
+    return () => cancelIdleCallback(handle);
+  }
+  const timer = setTimeout(work, 1500);
+  return () => clearTimeout(timer);
 }
 
 export function App() {
+  const [flow, dispatch] = useReducer(flowReducer, initialFlow);
   const [quality, setQualityState] = useState(readQuality);
+  // The preset the mounted scene uses: a change on the title applies at the next Start.
+  const [sceneQuality, setSceneQuality] = useState(quality);
   const [warmRound, setWarmRound] = useState(0);
-  const setQuality = (next: GraphicsQuality) => {
-    if (next === quality) return;
-    // A new preset changes lights, shadows and post-processing: prepare it behind the loading screen.
-    sceneLoader.getState().rewarm();
-    setWarmRound((round) => round + 1);
-    setQualityState(next);
-  };
+  const [cinematic, setCinematic] = useState(readCinematicEnabled);
+  const [engine, setEngine] = useState<EngineStatus>("none");
+  const [creditsOpen, setCreditsOpen] = useState(false);
+  const [matchMounted, setMatchMounted] = useState(false);
+  const [softwareGL, setSoftwareGL] = useState(false);
+  const pendingStart = useRef<(() => void) | null>(null);
+  const criticalReadyAt = useRef(0);
+  const stage = useStore(sceneLoader, (state) => state.stage);
+  const secondary = useStore(sceneLoader, (state) => state.secondary);
+  const gamePhase = useGameStore((state) => state.phase);
+  const hasSavedGame = useGameStore((state) => state.hasSavedGame);
+
   useEffect(() => {
     try { localStorage.setItem(QUALITY_KEY, quality); }
     catch { /* Private browsing can disable storage; the session setting still works. */ }
   }, [quality]);
-  // The menu appears once the WebGL context exists, so it is responsive from its first frame.
-  const [glReady, setGlReady] = useState(false);
-  const onSceneCreated = useCallback(() => setGlReady(true), []);
-  const stage = useStore(sceneLoader, (state) => state.stage);
-  const startPending = useStore(sceneLoader, (state) => state.startPending);
-  const ready = stage === "ready";
-  const pieces = useGameStore((state) => state.displayedPieces);
-  const selected = useGameStore((state) => state.selected);
-  const targets = useGameStore((state) => state.legalTargets);
-  const selectSquare = useGameStore((state) => state.selectSquare);
-  const phase = useGameStore((state) => state.phase);
-  const activeEvent = useGameStore((state) => state.animationQueue[0]);
-  const animationDone = useGameStore((state) => state.animationDone);
-  const gameId = useGameStore((state) => state.gameId);
 
-  const positionVersion = useGameStore((state) => state.positionVersion);
-  const lastUci = useGameStore((state) => state.game.uciHistory().at(-1));
-  // Leftover debris and dust belong to the previous position/game.
-  useEffect(() => effectsStore.getState().clear(), [gameId, positionVersion]);
+  // Prefetch while the title is shown: the match code, then its bytes at low priority.
+  useEffect(() => whenIdle(() => { void loadMatch().then((module) => module.prefetchSceneBytes()).catch(() => undefined); }), []);
 
-  const soundProvider = useGameSounds({ activeEvent });
+  /** Rebuilds the mounted scene for the preset behind the loading screen. */
+  const rewarmScene = (next: GraphicsQuality) => {
+    sceneLoader.getState().rewarm();
+    setWarmRound((round) => round + 1);
+    setSceneQuality(next);
+  };
+  const changeQuality = (next: GraphicsQuality) => {
+    if (next === quality) return;
+    setQualityState(next);
+    // In play it applies now; on the title it waits for the next Start (no scene work in the menu).
+    if (!isMenuScreen(flow.screen) && matchMounted) rewarmScene(next);
+  };
 
-  // A cinematic shot is decided once per move and outlives the move animation:
-  // it ends when the camera has returned (or the player skips it).
-  const [cinematicEnabled, setCinematicEnabled] = useState(readCinematicEnabled);
-  const [shot, setShot] = useState<CinematicShot | null>(null);
-  const [shotSource, setShotSource] = useState<MoveEvent | undefined>(undefined);
-  if (activeEvent !== shotSource) {
-    setShotSource(activeEvent);
-    if (activeEvent && cinematicEnabled) {
-      // The victim is still in the displayed pieces while its capture is animating.
-      const victim = activeEvent.captured && pieces.find((piece) => piece.id === activeEvent.captured!.pieceId);
-      if (qualifiesForCinematic(activeEvent, victim ? victim.type : undefined)) {
-        setShot(planCinematicShot(activeEvent, planMove(activeEvent).impact));
-      }
+  /** Start: the match loads behind the loading screen; `action` starts the game once it is ready. */
+  const begin = (action: () => void, vsEngine: boolean) => {
+    pendingStart.current = action;
+    if (!flow.sceneMounted) {
+      setSceneQuality(quality);
+      void loadMatch().then((module) => module.preloadCriticalScene(quality));
+    } else if (sceneQuality !== quality) {
+      rewarmScene(quality);
     }
-  }
+    if (vsEngine) {
+      const id = `build:engine-${flow.matchCount + 1}`;
+      loadProgress.add(id, { stage: "critical", phase: "build", total: 1 });
+      setEngine("pending");
+      void gameStore.getState().prepareEngine().then((ok) => {
+        loadProgress.done(id);
+        setEngine(ok ? "ready" : "failed");
+      });
+    } else {
+      setEngine("none");
+    }
+    dispatch({ type: "start" });
+  };
+  const startGame = (settings: GameSettings) => begin(() => gameStore.getState().startGame(settings), settings.mode === "ai");
+  const continueGame = () => begin(() => gameStore.getState().continueGame(), readSave(browserStorage())?.settings.mode === "ai");
+  const importGame = (text: string) => {
+    try { parsePgn(text); }
+    catch (error) { return error instanceof Error ? error.message : "Invalid PGN"; }
+    begin(() => { gameStore.getState().importPgn(text); }, false);
+    return null;
+  };
 
-  const [creditsOpen, setCreditsOpen] = useState(false);
+  // The canvas is created after the loading screen has painted: creating a WebGL context is
+  // one long task in software GL, and the screen must already be up when it runs.
+  useEffect(() => {
+    if (!flow.sceneMounted || matchMounted) return;
+    let frame = requestAnimationFrame(() => { frame = requestAnimationFrame(() => setMatchMounted(true)); });
+    return () => cancelAnimationFrame(frame);
+  }, [flow.sceneMounted, matchMounted]);
+
+  useEffect(() => { if (stage === "ready") criticalReadyAt.current = performance.now(); }, [stage]);
+
+  // The board is revealed (and the game starts) only once everything it needs is prepared.
+  useEffect(() => {
+    if (flow.screen !== "loading" || stage !== "ready" || engine === "pending") return;
+    const waited = performance.now() - criticalReadyAt.current;
+    const wait = readyToReveal({ scene: stage, engine, secondary, secondaryWaitMs: waited }) ? 0 : SECONDARY_WAIT_MS - waited;
+    const timer = setTimeout(() => {
+      const action = pendingStart.current;
+      pendingStart.current = null;
+      action?.();
+      dispatch({ type: "loaded" });
+    }, Math.max(0, wait));
+    return () => clearTimeout(timer);
+  }, [flow.screen, stage, engine, secondary]);
+
+  // Menu (HUD or game over) returns the game to setup: back to the title.
+  if (gamePhase === "setup" && (flow.screen === "playing" || flow.screen === "reveal")) dispatch({ type: "menu" });
+
+  const onRevealed = useCallback(() => dispatch({ type: "revealed" }), []);
+  const onRenderer = useCallback((software: boolean) => setSoftwareGL(software), []);
   const openCredits = useCallback(() => setCreditsOpen(true), []);
   const closeCredits = useCallback(() => setCreditsOpen(false), []);
+  const settings = { quality, onQuality: changeQuality, cinematic, onCinematic: setCinematic };
+  const rewarming = flow.screen === "playing" && stage !== "ready";
 
   return (
-    <div className="app" data-loading={ready ? undefined : ""}>
-      <ChessScene quality={quality} frameloop={!ready ? "never" : phase === "setup" ? "demand" : "always"}
-        secondary={ready || warmRound > 0} warmPass={warmPass(quality, warmRound)} onCreated={onSceneCreated}>
-        <CinematicCamera shot={shot} enabled={cinematicEnabled} onShotEnd={() => setShot(null)} />
-        <Board
-          selected={selected}
-          targets={targets}
-          lastMove={lastUci ? { from: lastUci.slice(0, 2), to: lastUci.slice(2, 4) } : undefined}
-          onSquareClick={selectSquare}
-        />
-        <ScenePieces
-          pieces={pieces}
-          activeEvent={activeEvent}
-          onAnimationDone={animationDone}
-          onImpact={effectsStore.getState().addBurst}
-          onPieceClick={selectSquare}
-        />
-      </ChessScene>
-      <LoadingScreen ready={ready} full={!glReady || phase !== "setup" || startPending || warmRound > 0} rewarm={warmRound > 0} />
-      {phase === "setup" ? glReady && !startPending && <SetupScreen onCredits={openCredits} /> : <Hud />}
-      {phase === "over" && <GameOverScreen />}
-      <PromotionPicker />
-      <nav className="command-bar" aria-label="Game commands">
-        {phase !== "setup" && <GameActions />}
-        <SettingsMenu>{(close) => <>
-          <label className="setting-row">
-            <span>Graphics</span>
-            <select aria-label="Graphics quality" value={quality} onChange={(event) => setQuality(event.target.value as GraphicsQuality)}>
-              <option value="high">High</option>
-              <option value="low">Low</option>
-            </select>
-          </label>
-          <div className="setting-row"><CinematicToggle enabled={cinematicEnabled} onChange={setCinematicEnabled} /></div>
-          <div className="setting-row"><MuteToggle provider={soundProvider} /></div>
-          <div className="setting-row">
-            <button type="button" onClick={() => { close(); openCredits(); }}>Credits</button>
-          </div>
-        </>}</SettingsMenu>
-      </nav>
+    // data-renderer="software": overlays over the canvas cut or step instead of fading (see styles.css).
+    <div className="app" data-screen={flow.screen} data-renderer={softwareGL ? "software" : undefined}>
+      {matchMounted && <Suspense fallback={null}>
+        <Match screen={flow.screen} quality={sceneQuality} warmRound={warmRound} onRevealed={onRevealed} onRenderer={onRenderer}
+          settings={{ ...settings, onCredits: openCredits }} />
+      </Suspense>}
+      {isMenuScreen(flow.screen) && <TitleScreen screen={flow.screen} mode={flow.mode} hasSavedGame={hasSavedGame}
+        dispatch={dispatch} onStart={startGame} onContinue={continueGame} onImport={importGame} onCredits={openCredits}
+        settings={settings} />}
+      <LoadingScreen active={flow.screen === "loading" || rewarming} rewarm={rewarming || (warmRound > 0 && stage !== "ready")}
+        art={loadingArtFor(flow.matchCount)} seed={flow.matchCount} secondary={flow.screen === "loading" ? secondary : "ready"} />
       {creditsOpen && <CreditsDialog onClose={closeCredits} />}
     </div>
   );

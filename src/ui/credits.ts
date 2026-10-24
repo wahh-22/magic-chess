@@ -9,6 +9,8 @@ export interface Credit {
 export const GAME_CREDITS: { title: string; lines: Credit[] }[] = [
   { title: "Pieces", lines: [{ asset: "ARCANA piece models", author: "Wilmer Henao", license: "CC BY 4.0",
     url: "https://creativecommons.org/licenses/by/4.0/" }] },
+  { title: "Key art", lines: [{ asset: "Key art rendered in-engine from the ARCANA piece models", author: "Wilmer Henao",
+    license: "CC BY 4.0", url: "https://creativecommons.org/licenses/by/4.0/" }] },
   { title: "Sounds", lines: [{ asset: "Impact Sounds", author: "Kenney", license: "CC0 1.0",
     url: "https://kenney.nl/assets/impact-sounds" }] },
   { title: "Engine", lines: [{ asset: "Stockfish", author: "The Stockfish developers", license: "GPLv3",

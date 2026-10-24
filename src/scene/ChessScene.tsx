@@ -1,7 +1,7 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
-import { ACESFilmicToneMapping, Vector3 } from "three";
+import { ACESFilmicToneMapping, Vector3, type WebGLRenderer } from "three";
 import { squareToWorld } from "./coords";
 import { Battlefield } from "./environment/Battlefield";
 import { SceneWarmup } from "./SceneWarmup";
@@ -56,7 +56,7 @@ function warmExtensions(gl: WebGLRenderingContext | WebGL2RenderingContext) {
 export function ChessScene({ children, quality = "high", frameloop = "always", secondary = true, warmPass = quality, onCreated }: {
   children: ReactNode;
   /** The WebGL renderer exists (creating its context is one long, unsplittable task in software GL). */
-  onCreated?: () => void;
+  onCreated?: (gl: WebGLRenderer) => void;
   quality?: GraphicsQuality;
   frameloop?: "never" | "demand" | "always";
   /** Stream the secondary set (scanned nature) in. */
@@ -68,7 +68,7 @@ export function ChessScene({ children, quality = "high", frameloop = "always", s
   return (
     // PCF explicitly: three r186 replaces PCFSoft (R3F's default) by PCF at the first shadow render,
     // which would recompile every program warmed before it.
-    <Canvas onCreated={({ gl }) => { warmExtensions(gl.getContext()); onCreated?.(); }} frameloop={frameloop} shadows="percentage" gl={{ toneMapping: ACESFilmicToneMapping, toneMappingExposure: 0.9 }} camera={{ position: DEFAULT_CAMERA, fov: CAMERA_FOV, near: 0.05, far: 1200 }} dpr={quality === "low" ? QUALITY_PRESETS.low.dpr : [1, QUALITY_PRESETS.high.dpr]}>
+    <Canvas onCreated={({ gl }) => { warmExtensions(gl.getContext()); onCreated?.(gl); }} frameloop={frameloop} shadows="percentage" gl={{ toneMapping: ACESFilmicToneMapping, toneMappingExposure: 0.9 }} camera={{ position: DEFAULT_CAMERA, fov: CAMERA_FOV, near: 0.05, far: 1200 }} dpr={quality === "low" ? QUALITY_PRESETS.low.dpr : [1, QUALITY_PRESETS.high.dpr]}>
       <Suspense fallback={null}>
         <Battlefield quality={quality} secondary={secondary} />
         {children}

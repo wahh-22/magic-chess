@@ -139,7 +139,11 @@ function loadMaterialLibrary(load: NonNullable<LoadOptions['load']>) {
       library.scene.traverse(object => {
         if (!(object instanceof Mesh)) return;
         for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
-          if (material instanceof MeshStandardMaterial) materials.set(material.name, material);
+          if (!(material instanceof MeshStandardMaterial)) continue;
+          // The swatches carry no normals, so GLTFLoader hands out flat-shaded clones; the pieces
+          // that receive these materials have authored normals and must shade smoothly.
+          material.flatShading = false;
+          materials.set(material.name, material);
         }
       });
       if (!materials.size) throw new Error('Empty shared material library');
