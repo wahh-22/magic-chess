@@ -12,6 +12,8 @@ and dust. Play against Stockfish or a friend on the same computer.
 
 ## Features
 
+- A title menu over in-engine key art (no 3D scene until you start), match setup, a
+  full-screen loading screen with real progress and tips, and a cinematic camera arrival.
 - Full chess rules (castling, en passant, promotion, every draw rule).
 - Stockfish opponent with five difficulty levels, running in a Web Worker.
 - Realistic stone piece models, animated moves, and physics-based shattering.
@@ -54,7 +56,8 @@ run on demand: *Actions → CI → Run workflow → scenarios*.
 - `src/core` — game rules, commands, engine, clock, PGN (no rendering code).
 - `src/scene` — the 3D board, pieces, animation, fracture, debris, camera.
 - `src/ui` — game store and screens. `src/audio` — sound playback.
-- `docs/architecture.md` — design principles and decisions D1–D15.
+- `docs/architecture.md` — design principles and decisions D1–D17.
+- `docs/performance.md` — loading performance: how it is measured, numbers, what remains.
 - `src/scene/environment` — decorative `Chamber` (`quality="high" | "low"`),
   deterministic flicker, layout and quality presets. Reflections use local Lightformers,
   so the chamber makes no third-party runtime requests.
@@ -74,6 +77,8 @@ assets and the chess engine keep their own licenses, listed below.
 - **Environment textures:** Poly Haven **Stone Floor** (Dimitrios Savva) and
   **Stone Wall 02** (Charlotte Baglioni / Dario Barresi), CC0. Six 1K WebP PBR maps,
   under 1 MB total. Source URLs and conversion details: `public/environment/LICENSE.md`.
+- **Key art:** rendered in-engine from the ARCANA piece models by Wilmer Henao,
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Details: `docs/art.md`.
 - **Sounds:** [Kenney Impact Sounds](https://kenney.nl/assets/impact-sounds), CC0.
   Details: `public/sounds/LICENSE.md`.
 - **Chess engine:** [Stockfish](https://stockfishchess.org) via

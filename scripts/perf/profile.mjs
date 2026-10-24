@@ -1,5 +1,6 @@
 // Attributes main-thread long tasks to their causes with a V8 CPU profile (CDP Profiler).
 // Usage: node scripts/perf/profile.mjs [high|low] [url] — against the running dev server.
+// Covers the title, the loading after Start, the cinematic reveal and a few seconds of play.
 // Every busy stretch longer than 50 ms is reported with its samples grouped by cause
 // (first matching frame from the leaf up) plus its hottest self-time functions.
 import { writeFileSync, mkdirSync } from "node:fs";
@@ -12,6 +13,7 @@ const LONG_MS = 50;
 /** Cause rules, checked against each frame from the leaf to the root; the first match wins. */
 const CAUSES = [
   ["WebGL context creation", (f) => f.functionName === "getContext"],
+  ["GPU readback (readPixels)", (f) => f.functionName === "readPixels"],
   ["shader compile/link", (f) => /^(onFirstUse|getProgramParameter|getProgramInfoLog|getShaderInfoLog|linkProgram|compileShader|WebGLProgram|fetchAttributeLocations|fetchUniformLocations|getProgramInfo)$/.test(f.functionName) || /WebGLProgram\.js/.test(f.url)],
   ["texture upload", (f) => /^(texImage2D|texSubImage2D|texStorage2D|compressedTexImage2D|generateMipmap|uploadTexture|setTexture2D|initTexture)$/.test(f.functionName)],
   ["image decode", (f) => /^(createImageBitmap|decode)$/.test(f.functionName) && !/meshopt/.test(f.url)],
@@ -47,16 +49,18 @@ try {
   await cdp.send("Profiler.start");
   const t0 = Date.now();
   await page.goto(url);
-  const button = page.getByRole("button", { name: "Start game" });
-  await button.waitFor({ timeout: 120000 });
+  // Title menu (no scene) → match setup → Start: the match loads behind the loading screen.
   const capture = Boolean(process.env.CAPTURE);
-  if (capture) await page.getByLabel("Two players on this computer", { exact: true }).click({ timeout: 120000 });
-  // Let the menu idle like a player reading it, then press Start.
+  const mode = page.getByRole("button", { name: capture ? "Two Players" : "Play vs Engine" });
+  await mode.waitFor({ timeout: 120000 });
+  // Let the title idle like a player reading it (the match bytes prefetch meanwhile), then start.
   await page.waitForTimeout(Number(process.env.MENU_WAIT_MS ?? 6000));
+  await mode.click();
+  const button = page.getByRole("button", { name: "Start game" });
   const c0 = Date.now();
   await button.click({ timeout: 300000 });
   const clickMs = Date.now() - c0;
-  await page.waitForFunction(() => (globalThis.__frames ?? 0) > 10, undefined, { timeout: 300000 });
+  await page.waitForFunction(() => document.querySelector(".app")?.dataset.screen === "playing", undefined, { timeout: 300000 });
   await page.waitForTimeout(6000);
   if (capture) {
     // CAPTURE=1: e4 d5 exd5 in a local game; the capture's tasks are marked in the output.

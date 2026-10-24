@@ -23,7 +23,8 @@ design can migrate to Unity or Unreal later if needed.
 
 ```text
 ┌──────────────────────────────────────────────────────────┐
-│ UI (React): setup, HUD, promotion picker, game over      │
+│ UI (React): title menu, match setup, loading screen,     │
+│   HUD, promotion picker, game over                       │
 ├──────────────────────────────────────────────────────────┤
 │ Scene (React Three Fiber + drei)                         │
 │   board · pieces · lighting · camera · animation queue   │
@@ -62,6 +63,7 @@ reports "animation done" → the next turn starts (or the engine is asked).
 | D14 | Setting: a dark vaulted stone chamber like the film — the board on a stone dais, pillars, arches, torches, fog, floating dust. | Matches the film and the user's choice. | — |
 | D15 | Environment assets are CC0 (Poly Haven / ambientCG PBR textures, HDRI, props) with lighting, fog, particles and post-processing in code; a graphics-quality setting keeps modest hardware playable. | Free, realistic, license-clean; procedural lighting keeps it tunable. | Performance on low-end devices is unacceptable even on "low". |
 | D16 | Professional loading (H9): one asset manager (`src/loading/`) reports real progress (bytes, then build, upload and shader steps) to a branded loading screen; the scene loads in stages — critical set mounted hidden and prepared (textures uploaded and programs linked in time slices, GPU work awaited through fences), revealed with a fade, then the secondary set streams in; procedural geometry is built in a worker, destruction parts are split in idle time. Details and numbers in `docs/performance.md`. | A frozen menu and multi-second hitches at start and first capture (worst under software GL, which CI uses) read as a broken game. | Moving to WebGPU or a native engine (both have their own async pipeline-compile APIs). |
+| D17 | AAA flow (H10): the app opens on a title menu that is plain DOM and CSS over in-engine key art — no canvas, no WebGL, no three.js code. The match (canvas, scene, Stockfish) is created only when the player presses Start, behind a full-screen loading screen (key art, tips, real progress); the board is revealed when the critical set, Stockfish (vs the engine) and the secondary set are prepared, through black with a short skippable camera arrival, then the HUD fades in. Back on the title the scene stays mounted, hidden and not rendering, so a rematch skips the loading; a graphics change made on the title applies at the next Start. While the title idles, the match code and its bytes are prefetched at low priority (no decoding, no GPU work) and the loader takes the prefetched bytes. With software GL, overlays over the canvas cut instead of fading. Flow, numbers and trade-offs in `docs/performance.md`. | "An AAA game's menu does not show the game environment yet" (user, H10 L1); the H9 menu waited 4–6 s for the WebGL context in software GL. A title that is only DOM shows in ~0.1 s; keeping the scene mounted makes a rematch near instant; the full-screen loading screen is where waiting belongs. | A rematch should change scene content the hidden scene cannot rebuild cheaply, or memory of a parked WebGL context matters (unmount it then; textures would need a fresh upload). |
 
 ## MVP milestones
 
