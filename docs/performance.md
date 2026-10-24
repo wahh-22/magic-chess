@@ -1,8 +1,10 @@
-# Magic Chess — Loading performance (H9)
+# Magic Chess — Loading performance (H9, H10)
 
-The game must never freeze: the menu answers while assets stream, the scene appears when
-it is ready, and neither the start nor the first capture hitches. This page records how
-loading is measured, what blocked the main thread, what fixed it, and what remains.
+The game must never freeze: the menu answers at once, the match loads behind a loading screen
+with real progress, the scene appears when it is ready, and neither the start nor the first
+capture hitches. This page records how loading is measured, what blocked the main thread,
+what fixed it, and what remains. H10 (title menu without the scene) is at the end; the H9
+sections describe the scene pipeline it still uses.
 
 ## How to measure
 
@@ -13,8 +15,8 @@ WebGL call needs a result.
 
 | Script | What it reports |
 |--------|-----------------|
-| `node scripts/perf/longtasks.mjs <high\|low> [--capture] [--shots]` | "Start game" click latency (pressed as soon as it shows), time until the scene is ready and the first interactive frame, long-task count/total/worst and histogram, long tasks after the menu appears, and with `--capture` the first capture's long tasks and worst frame gap. `--shots` saves loading, reveal and capture screenshots in `.shots/`. |
-| `node scripts/perf/profile.mjs <high\|low>` | A V8 CPU profile (CDP `Profiler`) of the same flow; every busy stretch over 50 ms is grouped by cause (shader link, texture upload, context creation, procedural generation, part splitting, React…) with its hottest functions. `CAPTURE=1` adds the first capture, `MENU_WAIT_MS` sets how long the menu idles before Start. |
+| `node scripts/perf/longtasks.mjs <high\|low> [--capture] [--shots] [--idle=<ms>]` | Title menu visible time (and that it has no canvas), "Start game" click latency, Start → scene ready / board revealed / playable (camera arrived, HUD up), long-task count/total/worst and histogram, split into title / loading / play, and with `--capture` the first capture's long tasks and worst frame gap. `--idle` waits on the title before Start (the match prefetches meanwhile; default: Start at once). `--shots` saves title, setup, loading, reveal, HUD, capture and back-to-title screenshots in `.shots/h10-*`. |
+| `node scripts/perf/profile.mjs <high\|low>` | A V8 CPU profile (CDP `Profiler`) of the same flow; every busy stretch over 50 ms is grouped by cause (shader link, texture upload, context creation, GPU readback, procedural generation, part splitting, React…) with its hottest functions. `CAPTURE=1` adds the first capture, `MENU_WAIT_MS` sets how long the title idles before Start. |
 
 The warm-up steps are also in the browser's performance timeline as `magic-chess:*`
 measures (environment map, uploads, programs, first frame), visible in DevTools.
@@ -90,24 +92,98 @@ Screenshots: `.shots/h9-loading-menu-<preset>.png` (bar under the menu, mid-prog
 Graphics preset changes prepare the new scene behind the loading screen too ("Applying the
 new graphics").
 
+## H10 — title menu without the scene, match loading after Start
+
+The H9 menu sat over the scene and appeared only once the WebGL context existed (4–6 s in
+software GL). H10 splits the app in two (architecture decision D17):
+
+```text
+title (DOM + key art) ─▶ match setup ─▶ Start ─▶ loading screen ─▶ reveal ─▶ play
+        ▲   no canvas, no three.js         canvas + scene + Stockfish        │
+        └──────────── Menu: the scene stays mounted, hidden, not rendering ◀─┘
+```
+
+| Step | What happens | Where |
+|------|--------------|-------|
+| First paint | `index.html` paints the title's first frame (inlined key-art placeholder, logo) and preloads the title image; React adds the menu in the same place. | `index.html`, `src/ui/TitleScreen.tsx`, `KeyArt.tsx` |
+| Title | Plain DOM; CSS ken-burns drift and a few CSS embers (off under reduced motion). The main chunk has no three.js: the match (canvas, scene, HUD) is a lazy chunk. | `src/ui/App.tsx`, `Match.tsx` |
+| Prefetch while the title idles | In an idle callback: the match chunk, then its bytes at low priority, two at a time — Stockfish into the HTTP cache, critical textures and models (from the model manifest), then the secondary set — kept as bytes, never decoded. Skipped with Save-Data. | `src/loading/prefetch.ts`, `src/scene/sceneAssets.ts` |
+| Start | Full-screen loading screen first; the canvas is created two frames later (context creation is one long task). The H9 pipeline runs (critical set, warm-up, secondary set) plus the Stockfish handshake vs the engine; downloads take the prefetched bytes (`fetchAsset` → prefetch cache) and the bar counts them. | `src/ui/App.tsx`, `src/loading/assets.ts`, `LoadingScreen.tsx` |
+| Reveal | When the critical set, Stockfish and the secondary set are ready (the secondary set gets at most 12 s), the game starts; the loading screen fades through black while the camera arrives from above (2.6 s, a click or key skips it); the HUD fades in. | `src/ui/flow.ts`, `src/scene/camera/ArrivalCamera.tsx`, `arrival.ts` |
+| Menu → title | The scene stays mounted with `frameloop="never"` and `visibility: hidden`; a rematch reveals it at once. A graphics change on the title waits for the next Start (then prepared behind the loading screen). | `src/ui/Match.tsx`, `App.tsx` |
+
+### What the reveal taught
+
+- **Full-screen layers over the canvas stall software GL.** With the loading screen fading,
+  a black veil lifting and the HUD fading in over the first frames, the page froze 2–6 s
+  (the CPU profile: one `uniformMatrix4fv` waiting for the GPU process). A veil that only
+  stepped six times still froze it; with no layer over the canvas the stall was gone (two
+  runs each). With software GL the loading screen now cuts straight to the scene and the
+  HUD and tips appear without fading; on a GPU the fades stay.
+- **The arrival shot frames the plaza.** A low shot across the land (ruins, foliage, terrain)
+  costs several times more per frame than the play camera and froze software GL for up to
+  5.8 s; the arrival now descends from above the board.
+- **Draw everything once behind the loading screen.** The warm-up frame used to draw only
+  what the play camera sees; any other camera then paid first draws (buffer uploads, and
+  in software GL pipeline builds). The warm frame now renders with frustum culling off.
+
+### Numbers
+
+Dev server, SwiftShader, 1280×800, load average 5–6 (compare orders of magnitude). "Idle" is
+how long the title was shown before Start; vs the engine (`longtasks.mjs`).
+
+| Metric | Low | High |
+|--------|-----|------|
+| Title menu visible (navigation → menu) | 118–135 ms | 120–124 ms |
+| Canvas on the title / long tasks while it is shown | none / 2, worst 0.13–0.17 s | none / 2, worst 0.12–0.17 s |
+| "Start game" click latency — idle 6 s / 1.5 s / Start at once | 30 ms / 236 ms / 1.3 s ¹ | 41 ms / — / 1.9 s ¹ |
+| Start → critical set ready — idle 6 s / at once | 8.8 s / 12.1 s | 10.3 s / 13.3 s |
+| Start → board revealed — idle 6 s / at once | 10.8 s / 13.9 s | 12.0 s / 15.0 s |
+| Start → playable (camera arrived, HUD up) — idle 6 s / at once | 15.3 s / 19.1 s ² | 18.2 s / 20.3 s ² |
+| Long tasks Start → playable — idle 6 s / at once | 13 / 1.1 s, worst 0.23 s; 15 / 2.0 s, worst 0.81 s ³ | 4 / 0.49 s, worst 0.31 s; 6 / 1.4 s, worst 0.77 s ³ |
+| Long tasks in the first 6 s of play | 0 | 0 |
+| Rematch (Menu → Start): Start → revealed / → playable | 0.03–0.09 s / 2.7–2.9 s ² | — |
+
+The prefetch takes about 3 s off the loading (scene ready 12.1 → 8.8 s low, 13.3 → 10.3 s
+high). H9 for comparison: menu visible after 4.0–4.7 s, first interactive frame 13.4–15.4 s
+after navigation, with the secondary set streaming in after the reveal and no arrival.
+
+¹ Start pressed ~0.1 s after the title appears, while the match code is still evaluating
+(hundreds of modules in the dev server); no player gets there that fast.
+² Includes the camera arrival; software GL renders it at a few frames per second, so it
+ends by its timer (2.6 s + 1.5 s grace). On a GPU it takes 2.6 s.
+³ The worst task is WebGL context creation (0.7–1 s here), behind the loading screen.
+
+Screenshots: `.shots/h10-title-<preset>.png`, `h10-setup-*`, `h10-loading-*` (mid-progress),
+`h10-reveal-*`, `h10-hud-*`, `h10-back-to-title-*` (`longtasks.mjs --shots`).
+
 ## Regression guard
 
-- `scripts/smoke.mjs` presses "Start game" as soon as it shows (low preset) and fails when
-  the click takes longer than `1000 ms × TIMEOUT_SCALE` (4 s at CI scale; the old loading
-  took 4–5 s unscaled).
+- `scripts/smoke.mjs` (low preset) fails when the title menu takes longer than
+  `2500 ms × TIMEOUT_SCALE` to show, when a canvas exists on the title or the match setup,
+  or when "Start game" takes longer than `1000 ms × TIMEOUT_SCALE` (4 s at CI scale; the old
+  loading took 4–5 s unscaled); it then waits for the reveal, plays, and checks that Menu
+  returns to the title with the scene parked hidden.
 - `scripts/perf/longtasks.mjs` gives the full numbers above.
 - Unit tests cover the progress aggregation, the time-sliced queue, the staged loader, the
-  fence, the program warm-up, mip chains, geometry transfer and the idle part splitting.
+  fence, the program warm-up, mip chains, geometry transfer, the idle part splitting, and
+  (H10) the app flow and reveal gate, menu navigation, the prefetch cache and list, the
+  loading tips and bar, the arrival camera and the key-art placeholders.
 
 ## Still open
 
-- **WebGL context creation** (2–5 s in software GL) cannot be split; it now runs behind the
-  splash. On a GPU it is tens of milliseconds.
+- **WebGL context creation** (0.7–5 s in software GL) cannot be split; since H10 it runs
+  after Start, behind the loading screen. On a GPU it is tens of milliseconds.
+- **Arrival in software GL** renders at a few frames per second (it ends by its timer).
+- **Prefetched code is evaluated** in an idle callback on the title (one task per module;
+  the three.js chunk is the largest): a Start pressed in that instant waits for it.
+- **The parked scene** keeps its WebGL context and GPU memory while the title is shown.
 - **First warm frame**: shadow-depth and post-processing programs compile inside the one
   frame rendered behind the loading screen (three gives no async path for them); its GPU
   work then finishes without blocking (3–5 s in software GL).
-- **`AudioContext`** is created in the first click (0.1–0.3 s headless).
+- **`AudioContext`** is created in the first click or key press (0.1–0.3 s headless) — since
+  H10 on the title, for the menu sounds, not in "Start game".
 - **Idle part splitting** is ~0.1 s per piece/colour in software GL; a capture before it
   finishes splits that piece on the spot.
-- Tasks while the menu is shown are 0.1–0.4 s in software GL (GLB parsing, CPU skinning of
+- Tasks while the match loads are 0.1–0.4 s in software GL (GLB parsing, CPU skinning of
   the rigs, React mounting the scene); on a GPU machine they are several times shorter.
