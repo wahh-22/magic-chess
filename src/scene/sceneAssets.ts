@@ -1,7 +1,10 @@
 import { loadProgress, loadTexture, track } from "../loading/assets";
+import { scenePrefetchList } from "../loading/prefetch";
 import { resources } from "../loading/resource";
+import { prefetched } from "../loading/state";
 import { QUALITY_PRESETS, SKY, type GraphicsQuality } from "./environment/battlefieldConfig";
 import { preloadEnvironment } from "./environment/environmentData";
+import { SCANNED_MODELS } from "./environment/scatterLayout";
 import { stoneMapUrls } from "./environment/stoneMaterials";
 import { loadPieceModels } from "./pieces/gltfPieces";
 import type { PieceModelProvider } from "./pieces/PieceModelProvider";
@@ -51,4 +54,31 @@ export function preloadCriticalScene(quality: GraphicsQuality) {
     .then(() => import("./environment/ScannedNature"))
     .then(({ preloadScannedNature }) => preloadScannedNature())
     .catch(() => undefined);
+}
+
+/** Scanned nature models (the secondary set); same paths as ScannedNature loads. */
+const SECONDARY_MODELS = Object.values(SCANNED_MODELS).map(({ id }) => `/environment/models/${id}.glb`);
+/** Stockfish (scripts/copy-stockfish.mjs): its worker loads them itself, from the HTTP cache once warmed. */
+const ENGINE_FILES = ["/stockfish/stockfish-19-lite-single.js", "/stockfish/stockfish-19-lite-single.wasm"];
+
+let prefetching = false;
+
+/**
+ * Behind the title menu: downloads the match's bytes at low priority (Stockfish, critical
+ * textures and models, then the secondary set) without decoding or touching the GPU; the
+ * loading after Start takes them from the prefetch cache. Skipped when the player asked the
+ * browser to save data.
+ */
+export async function prefetchSceneBytes() {
+  if (prefetching || started) return;
+  prefetching = true;
+  const connection = (navigator as { connection?: { saveData?: boolean } }).connection;
+  if (connection?.saveData) return;
+  prefetched.warm(ENGINE_FILES);
+  const manifest: unknown = await fetch("/models/manifest.json", { priority: "low", headers: { Accept: "application/json" } })
+    .then((response) => response.ok ? response.json() : null)
+    .catch(() => null);
+  // Start pressed meanwhile: the loader is already fetching everything itself.
+  if (started) return;
+  prefetched.prefetch(scenePrefetchList(manifest, CRITICAL_TEXTURES, SECONDARY_MODELS));
 }

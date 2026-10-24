@@ -110,6 +110,26 @@ describe("gameStore", () => {
     expect(engine.newGame).toHaveBeenCalledTimes(2);
   });
 
+  it("prepares Stockfish behind the loading screen and reuses it for the game", async () => {
+    const { store, engine, createEngine } = setup();
+    await expect(store.getState().prepareEngine()).resolves.toBe(true);
+    expect(createEngine).toHaveBeenCalledTimes(1);
+    expect(engine.newGame).toHaveBeenCalledTimes(1);
+    expect(store.getState().phase).toBe("setup");
+    store.getState().startGame(ai);
+    await flush();
+    expect(createEngine).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a failed engine preparation without throwing; the game retries on its turn", async () => {
+    const { store, engine } = setup();
+    vi.mocked(engine.newGame).mockRejectedValueOnce(new Error("handshake timed out"));
+    await expect(store.getState().prepareEngine()).resolves.toBe(false);
+    expect(store.getState().lastError).toBeNull();
+    const throwing = createGameStore({ createEngine: () => { throw new Error("no workers"); } });
+    await expect(throwing.getState().prepareEngine()).resolves.toBe(false);
+  });
+
   it.each(["new game", "setup"])("discards stale AI results after %s", async (transition) => {
     const { store, requests } = setup();
     store.getState().startGame({ ...ai, humanColor: "b" });
