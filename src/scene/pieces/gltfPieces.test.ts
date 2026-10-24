@@ -132,6 +132,21 @@ describe("glTF pieces (H4 S2, S6)", () => {
     expect(load.mock.calls.filter(([url]) => url.endsWith('arcana-materials.glb'))).toHaveLength(1);
   });
 
+  it('keeps library materials smooth although the normal-less swatches load them flat-shaded', async () => {
+    // GLTFLoader flags materials of geometry without normals as flat-shaded; the pieces carry normals.
+    const plate = new MeshStandardMaterial({ flatShading: true });
+    plate.name = 'plate';
+    const load = vi.fn(async (url: string) => {
+      if (url.endsWith('arcana-materials.glb')) return scene(box(), plate);
+      const placeholder = new MeshStandardMaterial(); placeholder.name = 'plate';
+      return scene(box(), placeholder);
+    });
+    const colors = { w: { ...entry, file: 'p-w.glb' }, b: { ...entry, file: 'p-b.glb' } };
+    const provider = await loadPieceModels({ fetch: fetchManifest({ version: 1, materialLibrary: 'arcana-materials.glb', pieces: { p: { colors } } }), load });
+    expect((provider.material('p', 'w') as MeshStandardMaterial).flatShading).toBe(false);
+    expect((provider.material('p', 'b') as MeshStandardMaterial).flatShading).toBe(false);
+  });
+
   it('rejects unsafe libraries and falls back when a named shared material is absent', async () => {
     const fallback = createProceduralPieceProvider();
     const load = vi.fn(async () => scene());
