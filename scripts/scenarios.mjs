@@ -1,4 +1,4 @@
-// H1–H3 browser verification. Run against Vite: node scripts/scenarios.mjs [url]
+// H1–H3 browser verification (through the H10 title menu). Run against Vite: node scripts/scenarios.mjs [url]
 // Only submit commands: the mounted scene must finish every real animation.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -97,17 +97,17 @@ async function start(ai = false, timed = false) {
   await page.evaluate((key) => localStorage.removeItem(key), saveKey);
   await page.reload();
   await page.waitForFunction(() => globalThis.__gameStore?.getState().phase === "setup");
-  // Like a player, interact once the scene has drawn: the first frame compiles shaders and
-  // uploads textures, which blocks the main thread for seconds under software rendering.
-  await page.waitForFunction(() => (globalThis.__frames ?? 0) >= 1, undefined, { timeout: 60000 });
-  await choose(page.getByLabel(ai ? "Play vs the engine" : "Two players on this computer", { exact: true }));
+  // Title menu (no scene yet) → match setup; the match loads after "Start game".
+  await page.getByRole("button", { name: ai ? "Play vs Engine" : "Two Players", exact: true }).click();
   if (ai) {
     await choose(page.getByLabel("White", { exact: true }));
     await page.getByLabel("Difficulty", { exact: true }).selectOption({ label: "Beginner" });
   }
   if (timed) await page.getByLabel("Time control", { exact: true }).selectOption("5+0");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
-  await page.waitForFunction(() => globalThis.__gameStore.getState().phase === "playing" && globalThis.__frames > 20);
+  // Like a player, act once the camera has arrived and the HUD is up.
+  await page.waitForFunction(() => globalThis.__gameStore.getState().phase === "playing" &&
+    document.querySelector(".app")?.dataset.screen === "playing" && globalThis.__frames > 20);
   const s = await state();
   assert.equal(s.settings.mode, ai ? "ai" : "local");
   assert.equal(s.history.length, 0);
@@ -318,7 +318,7 @@ const scenarios = [
     await page.reload();
     await page.waitForFunction(() => globalThis.__gameStore?.getState().phase === "setup");
     const resume = page.getByRole("button", { name: "Continue game", exact: true });
-    assert.ok(await resume.isVisible());
+    await resume.waitFor();
     await resume.click();
     await page.waitForFunction(() => globalThis.__gameStore.getState().phase === "playing");
     const restored = await state();
@@ -363,8 +363,8 @@ const scenarios = [
     const rejected = await state();
     assert.equal(rejected.phase, "setup");
     assert.deepEqual(rejected.history, before.history, "invalid import leaves game unchanged");
-    assert.ok(await page.getByRole("button", { name: "Start game", exact: true }).isVisible());
-    return "HUD download Event Magic Chess, SAN capture/castling; file import restores history/ids; invalid PGN shows readable error and stays on setup";
+    assert.ok(await page.getByRole("button", { name: "Play vs Engine", exact: true }).isVisible(), "still on the title menu");
+    return "HUD download Event Magic Chess, SAN capture/castling; file import from the title restores history/ids; invalid PGN shows readable error and stays on the title";
   }],
   ["vs-engine", async () => {
     let replies = 0;

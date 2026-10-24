@@ -129,32 +129,14 @@ input {
   text-align: center;
 }
 
-/* ——— Setup ——— */
+/* ——— Overlays ——— */
 
-.setup-backdrop,
 .game-over-overlay,
 .modal-backdrop {
   position: fixed;
   inset: 0;
   display: grid;
   place-items: center;
-}
-
-.setup-backdrop {
-  z-index: 5;
-  overflow-y: auto;
-  padding: 1.5rem 0 4.5rem;
-  box-sizing: border-box;
-  background: radial-gradient(ellipse at center, rgb(8 7 10 / 35%), rgb(5 5 8 / 78%));
-}
-
-.setup-panel {
-  display: flex;
-  flex-direction: column;
-  width: min(25rem, calc(100vw - 2.5rem));
-  padding: 1.1rem 1.6rem 0.9rem;
-  background: var(--panel);
-  backdrop-filter: blur(6px);
 }
 
 .setup-crest {
@@ -164,35 +146,9 @@ input {
   margin-bottom: 0.35rem;
 }
 
-.setup-panel h1 {
-  text-align: center;
-  font-size: 2rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-}
-
-.setup-subtitle {
-  margin: 0.3rem 0 0.8rem;
-  text-align: center;
-  color: var(--ivory-muted);
-  font-style: italic;
-  font-size: 1.05rem;
-}
-
-.setup-panel .continue-button {
-  margin-bottom: 1rem;
-}
-
-.setup-panel fieldset {
-  margin: 0 0 0.7rem;
-  padding: 0.2rem 0.75rem 0.45rem;
-  border: 1px solid var(--gold-faint);
-  border-radius: 2px;
-}
-
-.setup-panel legend,
 .field-label {
-  padding: 0 0.35rem;
+  display: block;
+  margin: 0.35rem 0 0.3rem;
   color: var(--gold);
   font-family: var(--font-display);
   font-size: 0.72rem;
@@ -200,101 +156,485 @@ input {
   text-transform: uppercase;
 }
 
-.field-label {
-  display: block;
-  margin: 0.35rem 0 0.3rem;
-  padding: 0;
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
-.setup-panel fieldset label {
+/* ——— Title screen: key art and a console-style menu; no canvas, no scene ——— */
+
+.title-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow: hidden;
+  background: #08070a;
+}
+
+.title-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 68% 42%, rgb(210 174 99 / 10%), transparent 55%),
+    radial-gradient(ellipse at 30% 60%, #17151b 0%, #0b0b0f 70%);
+}
+
+/* Key art (KeyArt.tsx): placeholder at once, full image fades in, gradient if missing. */
+.key-art {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.key-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.key-art-lqip {
+  filter: blur(16px);
+  transform: scale(1.08);
+}
+
+.key-art-image {
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+
+/* The title art keeps its left side dark for the menu (portrait: its lower part). */
+.title-art img {
+  object-position: right center;
+}
+
+@media (max-aspect-ratio: 4/5) {
+  .title-art img {
+    object-position: center top;
+  }
+}
+
+.key-art[data-art="loaded"] .key-art-image {
+  opacity: 1;
+}
+
+.key-art-image[data-instant] {
+  transition: none;
+}
+
+/* Slow ken-burns drift: a composited transform, no repaint (nothing else renders here). */
+.title-art {
+  transform-origin: 62% 45%;
+  animation: title-drift 48s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes title-drift {
+  from { transform: scale(1.04); }
+  to { transform: scale(1.12) translate3d(-1.5%, -1%, 0); }
+}
+
+.title-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgb(6 5 8 / 90%) 0%, rgb(6 5 8 / 66%) 32%, rgb(6 5 8 / 10%) 62%, transparent),
+    linear-gradient(0deg, rgb(6 5 8 / 72%), transparent 32%);
+}
+
+.title-embers span {
+  position: absolute;
+  bottom: -2vh;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe2ad 0%, #ff9a4a 45%, transparent 72%);
+  opacity: 0;
+  animation: ember-rise linear infinite;
+}
+
+@keyframes ember-rise {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; }
+  12% { opacity: 0.9; }
+  70% { opacity: 0.45; }
+  100% { transform: translate3d(var(--drift), -96vh, 0); opacity: 0; }
+}
+
+.title-content {
+  position: relative;
+  z-index: 1;
   display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.25rem 0;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(40rem, 100%);
+  height: 100%;
+  overflow-y: auto;
+  /* Same top offset as the static splash in index.html: the logo does not move when React takes over. */
+  padding: clamp(2rem, 14vh, 8rem) clamp(1.5rem, 7vw, 7rem) 4.5rem;
+}
+
+.title-crest {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.7rem;
+}
+
+.title-logo h1 {
+  margin: 0;
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 5.4vw, 4.3rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: 0.14em;
+  text-shadow: 0 0.2rem 1.6rem rgb(0 0 0 / 80%), 0 0 2.4rem rgb(210 174 99 / 22%);
+}
+
+.title-subtitle {
+  margin: 0.55rem 0 0;
+  color: var(--ivory-muted);
+  font-size: 1.3rem;
+  font-style: italic;
+  letter-spacing: 0.04em;
+}
+
+.title-subtitle::after {
+  content: "";
+  display: block;
+  width: 11rem;
+  height: 1px;
+  margin-top: 0.9rem;
+  background: linear-gradient(90deg, var(--gold), var(--gold-line) 40%, transparent);
+}
+
+.title-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  width: min(24rem, 100%);
+  margin-top: 2rem;
+}
+
+.menu-item {
+  position: relative;
+  padding: 0.62rem 1rem 0.62rem 2rem;
+  border: 0;
+  border-left: 1px solid transparent;
+  background: transparent;
+  color: var(--ivory);
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  letter-spacing: 0.16em;
+  text-align: left;
+  text-transform: uppercase;
+  text-shadow: 0 0.1rem 0.8rem rgb(0 0 0 / 70%);
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+/* A span, not ::before: generated content would join the button's accessible name. */
+.menu-item-mark {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  margin-top: -0.4rem;
+  color: var(--gold);
+  font-size: 0.62rem;
+  line-height: 0.8rem;
+  opacity: 0;
+  transform: translateX(-0.35rem);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.menu-item:focus,
+.menu-item:hover {
+  border-left-color: var(--gold);
+  background: linear-gradient(90deg, rgb(210 174 99 / 17%), rgb(210 174 99 / 4%) 70%, transparent);
+  color: var(--gold-bright);
+  outline: none;
+}
+
+.menu-item:focus .menu-item-mark,
+.menu-item:hover .menu-item-mark {
+  opacity: 1;
+  transform: none;
+}
+
+.menu-item:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--gold-line);
+}
+
+/* What the focused item does: one line, so the list never shifts. */
+.title-menu-help {
+  min-height: 1.4em;
+  margin: 0.7rem 0 0;
+  padding-left: 2rem;
+  color: var(--ivory-muted);
+  font-size: 1.05rem;
+  font-style: italic;
+  text-shadow: 0 0.1rem 0.8rem rgb(0 0 0 / 70%);
+}
+
+/* Setup and settings: the logo steps back so the panel fits. */
+.title-screen:not([data-screen="title"]) .title-logo h1 {
+  font-size: 1.9rem;
+  line-height: 1.15;
+}
+
+.title-screen:not([data-screen="title"]) .title-subtitle {
+  display: none;
+}
+
+.title-error {
+  max-width: 24rem;
+  margin: 1rem 0 0;
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+
+.title-subscreen {
+  margin-top: 1.2rem;
+}
+
+/* Over the key art: no backdrop-filter (costly to composite), a denser panel instead. */
+.match-setup,
+.title-settings {
+  display: flex;
+  flex-direction: column;
+  width: min(27rem, 100%);
+  padding: 1.1rem 1.5rem 1.2rem;
+  background: linear-gradient(180deg, rgb(26 24 29 / 93%), rgb(10 9 12 / 95%));
+}
+
+.match-setup-kicker {
+  margin: 0 0 0.25rem;
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.match-setup h2,
+.title-settings h2 {
+  font-size: 1.45rem;
+  text-align: center;
+}
+
+.crest-choices {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.55rem;
+  margin: 0.9rem 0 0.35rem;
+  padding: 0;
+  border: 0;
+}
+
+.crest-choices legend {
+  margin-bottom: 0.5rem;
+  padding: 0;
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.crest-choice {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  padding: 0.7rem 0.35rem 0.6rem;
+  border: 1px solid var(--gold-faint);
+  border-radius: 2px;
+  background: rgb(10 9 12 / 55%);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+/* The radio stays focusable and keyboard-operable; the crest card is its visible face. */
+.crest-choice input {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
   cursor: pointer;
 }
 
-.setup-panel input[type="radio"] {
-  margin: 0;
-  accent-color: var(--gold);
+.crest-choice:hover {
+  border-color: var(--gold-line);
 }
 
-.color-choices {
-  display: flex;
-  gap: 0.2rem 0.9rem;
-  flex-wrap: wrap;
+.crest-choice:has(input:checked) {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, rgb(74 60 34 / 60%), rgb(20 17 12 / 75%));
+  box-shadow: inset 0 0 0 1px rgb(240 217 160 / 22%), 0 0 1.2rem rgb(210 174 99 / 16%);
 }
 
-.setup-row {
+.crest-choice:has(input:focus-visible) {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 2px;
+}
+
+.crest-art {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0 0.8rem;
-}
-
-.setup-row > :only-child {
-  grid-column: 1 / -1;
+  place-items: center;
+  height: 52px;
 }
 
 .random-emblem {
   display: inline-flex;
 }
 
-.setup-panel select {
+.crest-label {
+  color: var(--ivory);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.crest-choice:has(input:checked) .crest-label {
+  color: var(--gold-bright);
+}
+
+.crest-hint {
+  color: var(--ivory-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+  text-align: center;
+}
+
+.setup-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 0.8rem;
+  margin-top: 0.4rem;
+}
+
+.setup-row > :only-child {
+  grid-column: 1 / -1;
+}
+
+.match-setup select,
+.title-settings select {
   width: 100%;
-  margin-bottom: 0.5rem;
   font-family: var(--font-body);
   font-size: 1rem;
   letter-spacing: 0;
 }
 
-.setup-panel .start-button {
-  margin-top: 0.6rem;
+.match-setup-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+}
+
+.match-setup .start-button {
+  flex: 1;
   padding: 0.75rem;
   font-size: 0.95rem;
   letter-spacing: 0.18em;
 }
 
-.setup-footer {
-  margin-top: 0.9rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--gold-faint);
+.title-settings-fields {
+  display: grid;
+  margin-top: 0.8rem;
 }
 
-.setup-footer input[type="file"] {
-  width: 100%;
+.title-hints {
+  position: absolute;
+  z-index: 1;
+  left: clamp(1.5rem, 7vw, 7rem);
+  bottom: 1.4rem;
+  display: flex;
+  gap: 1.4rem;
   color: var(--ivory-muted);
-  font-size: 0.9rem;
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
-.setup-footer input[type="file"]::file-selector-button {
-  margin-right: 0.6rem;
-  padding: 0.3rem 0.7rem;
+.title-hints kbd {
+  display: inline-block;
+  min-width: 1.1rem;
+  margin-right: 0.3rem;
+  padding: 0.05rem 0.3rem;
   border: 1px solid var(--gold-line);
   border-radius: 2px;
-  background: #1f1d22;
-  color: var(--ivory);
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  cursor: pointer;
+  color: var(--gold-bright);
+  font-family: inherit;
+  text-align: center;
 }
 
-.setup-error {
-  margin: 0.5rem 0 0;
-  color: var(--danger);
-  overflow-wrap: anywhere;
+@media (max-width: 700px) {
+  .title-content {
+    width: 100%;
+    justify-content: flex-end;
+    padding: 2.5rem 1.4rem 2rem;
+  }
+
+  .title-shade {
+    background: linear-gradient(0deg, rgb(6 5 8 / 94%) 0%, rgb(6 5 8 / 70%) 45%, rgb(6 5 8 / 15%) 75%, transparent);
+  }
+
+  .title-hints {
+    display: none;
+  }
 }
 
-.arcana-panel .link-button {
-  display: block;
-  margin: 0.55rem auto 0;
-  padding: 0.2rem 0.4rem;
-  border: none;
-  background: none;
-  color: var(--ivory-muted);
-  text-decoration: underline;
-  text-decoration-color: var(--gold-faint);
-  text-underline-offset: 0.25em;
+/* ——— Match: hidden on the title, revealed through black ——— */
+
+.match-stage {
+  position: fixed;
+  inset: 0;
+}
+
+.match-stage.is-hidden {
+  visibility: hidden;
+}
+
+.reveal-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 38;
+  background: #000;
+  pointer-events: none;
+  animation: veil-lift 1.5s ease 0.35s forwards;
+}
+
+@keyframes veil-lift {
+  to { opacity: 0; }
+}
+
+/*
+ * Software GL (one CPU-bound GPU process for WebGL and compositing): full-screen fades over
+ * the canvas stall the page for seconds. The loading screen cuts to the scene (no veil, see
+ * Match.tsx), the HUD and the tips appear without fading.
+ */
+.app[data-renderer="software"] .match-hud,
+.app[data-renderer="software"] .loading-tip {
+  animation: none;
+}
+
+.app[data-renderer="software"] .loading-screen {
+  transition: none;
+}
+
+.match-hud {
+  animation: hud-in 0.7s ease both;
+}
+
+@keyframes hud-in {
+  from { opacity: 0; }
 }
 
 /* ——— In-game top bar ——— */
@@ -954,21 +1294,17 @@ input {
   }
 }
 
-/* ——— Loading ——— */
+/* ——— Loading: full screen while a match is prepared ——— */
 
-/* Over the canvas, under the setup menu: the menu stays usable while the bar fills. */
 .loading-screen {
   position: fixed;
   inset: 0;
-  z-index: 4;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  z-index: 40;
+  overflow: hidden;
   background:
     radial-gradient(ellipse at 50% 40%, rgb(210 174 99 / 8%), transparent 58%),
     radial-gradient(ellipse at center, #17151b 0%, #0b0b0f 72%);
-  transition: opacity 0.8s ease;
+  transition: opacity 0.7s ease;
 }
 
 .loading-screen.is-leaving {
@@ -976,42 +1312,67 @@ input {
   pointer-events: none;
 }
 
+.loading-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(0deg, rgb(6 5 8 / 94%) 0%, rgb(6 5 8 / 60%) 26%, transparent 55%),
+    linear-gradient(180deg, rgb(6 5 8 / 62%), transparent 24%);
+}
+
 .loading-title {
-  text-align: center;
+  position: absolute;
+  top: 1.5rem;
+  left: clamp(1.5rem, 5vw, 4rem);
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.loading-title .setup-crest {
+  margin: 0;
 }
 
 .loading-title h1 {
   margin: 0;
   color: var(--gold-bright);
   font-family: var(--font-display);
-  font-size: 2.4rem;
+  font-size: 1.45rem;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
+  text-shadow: 0 0.1rem 1rem rgb(0 0 0 / 80%);
 }
 
-.loading-meter {
+.loading-footer {
   position: absolute;
   left: 50%;
-  bottom: 1.6rem;
-  width: min(26rem, calc(100vw - 3rem));
+  bottom: 2.2rem;
+  width: min(40rem, calc(100vw - 3rem));
   transform: translateX(-50%);
 }
 
-.loading-screen.is-full .loading-meter {
-  position: static;
-  margin-top: 1.6rem;
-  transform: none;
+/* One short fade per tip (every few seconds), never a loop. */
+.loading-tip {
+  margin: 0 0 1.2rem;
+  color: var(--ivory);
+  font-size: 1.22rem;
+  font-style: italic;
+  line-height: 1.4;
+  text-align: center;
+  text-shadow: 0 0.1rem 0.8rem #000;
+  animation: tip-in 0.6s ease both;
 }
 
-.loading-meter.is-floating {
-  position: fixed;
-  z-index: 6;
-  pointer-events: none;
-  transition: opacity 0.8s ease;
+@keyframes tip-in {
+  from { opacity: 0; }
 }
 
-.loading-meter.is-floating.is-leaving {
-  opacity: 0;
+.loading-tip-mark {
+  margin-right: 0.6rem;
+  color: var(--gold);
+  font-size: 0.65rem;
+  font-style: normal;
+  vertical-align: 0.25em;
 }
 
 .loading-bar {
@@ -1040,11 +1401,6 @@ input {
   opacity: 0.35;
 }
 
-/* Behind the loading screen there is nothing to blur; a backdrop filter is costly to composite. */
-.app[data-loading] .setup-panel {
-  backdrop-filter: none;
-}
-
 .loading-caption {
   display: flex;
   justify-content: space-between;
@@ -1065,12 +1421,26 @@ input {
 
 @media (prefers-reduced-motion: reduce) {
   .hud-banner,
-  .clock.low.running {
+  .clock.low.running,
+  .title-art,
+  .loading-tip,
+  .match-hud {
     animation: none;
   }
 
+  .title-embers {
+    display: none;
+  }
+
+  .reveal-veil {
+    animation-duration: 0.4s;
+    animation-delay: 0s;
+  }
+
   .loading-screen,
-  .loading-meter.is-floating {
+  .key-art-image,
+  .menu-item,
+  .menu-item-mark {
     transition: none;
   }
 }

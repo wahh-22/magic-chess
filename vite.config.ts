@@ -7,8 +7,9 @@ export default defineConfig({
     rolldownOptions: {
       output: {
         // three.js and React Three Fiber change rarely: a separate chunk stays cached across game updates.
+        // Its dependencies (React, zustand) stay out, or the title screen's entry would import three.js.
         advancedChunks: {
-          groups: [{ name: "three", test: /node_modules[\\/](three|@react-three[\\/](fiber|drei))[\\/]/ }],
+          groups: [{ name: "three", test: /node_modules[\\/](three|@react-three[\\/](fiber|drei))[\\/]/, includeDependenciesRecursively: false }],
         },
       },
     },

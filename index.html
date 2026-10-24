@@ -6,26 +6,35 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preload" href="/fonts/cinzel-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/cormorant-garamond-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- The title's key art starts downloading with the page, not after the script. -->
+    <link rel="preload" href="/art/title.webp" as="image" type="image/webp" media="(min-aspect-ratio: 4/5)" fetchpriority="high" />
+    <link rel="preload" href="/art/title-portrait.webp" as="image" type="image/webp" media="(max-aspect-ratio: 4/5)" fetchpriority="high" />
     <title>Magic Chess</title>
-    <!-- First paint, before any script: the same branded loading screen React takes over. -->
+    <!-- First paint, before any script: the title screen's first frame (key-art placeholder, inlined from
+         public/art/key-art.json, and the logo in the same place); React adds the menu and the full art. -->
     <style>
       @font-face { font-family: "Cinzel"; src: url("/fonts/cinzel-latin-wght.woff2") format("woff2"); font-weight: 400 900; font-display: swap; }
-      html, body { margin: 0; height: 100%; background: #0b0b0f; }
-      .boot-splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-        background: radial-gradient(ellipse at 50% 40%, rgb(210 174 99 / 8%), transparent 58%), radial-gradient(ellipse at center, #17151b 0%, #0b0b0f 72%);
-        color: #f0d9a0; font-family: "Cinzel", Georgia, serif; }
-      .boot-splash h1 { margin: 0; font-size: 2.4rem; font-weight: 600; letter-spacing: 0.12em; }
-      .boot-splash .bar { position: relative; overflow: hidden; width: min(26rem, calc(100vw - 3rem)); height: 6px; margin-top: 1.6rem;
-        border: 1px solid rgb(210 174 99 / 55%); border-radius: 3px; background: rgb(10 9 12 / 85%); }
-      .boot-splash .bar::after { content: ""; position: absolute; inset: 0; width: 30%;
-        background: linear-gradient(90deg, transparent, rgb(255 240 200 / 38%), transparent); animation: boot-glint 1.6s linear infinite; }
-      @keyframes boot-glint { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
-      @media (prefers-reduced-motion: reduce) { .boot-splash .bar::after { animation: none; } }
+      @font-face { font-family: "Cormorant Garamond"; src: url("/fonts/cormorant-garamond-latin-wght.woff2") format("woff2"); font-weight: 300 700; font-display: swap; }
+      html, body { margin: 0; height: 100%; background: #08070a; }
+      .boot-title { position: fixed; inset: 0; overflow: hidden;
+        background: radial-gradient(ellipse at 68% 42%, rgb(210 174 99 / 10%), transparent 55%), radial-gradient(ellipse at 30% 60%, #17151b 0%, #0b0b0f 70%); }
+      .boot-title .art { position: absolute; inset: 0; background: url("data:image/webp;base64,UklGRngAAABXRUJQVlA4IGwAAACwBACdASogABIAPsVQoEunpKMhsAwA8BiJQBjmCv38CHlBh30IdwxN4JbWHh/gAP79me4IEdvZOzgoQALu/Xebuisl1HVmscVBmp1XUiSslwkYHOi1HEmnCHt2I7txW37NWuG2U33vuxkQAAA=") right center / cover no-repeat; filter: blur(16px); transform: scale(1.12); }
+      .boot-title .shade { position: absolute; inset: 0;
+        background: linear-gradient(90deg, rgb(6 5 8 / 90%) 0%, rgb(6 5 8 / 66%) 32%, rgb(6 5 8 / 10%) 62%, transparent), linear-gradient(0deg, rgb(6 5 8 / 72%), transparent 32%); }
+      .boot-title .logo { position: relative; box-sizing: border-box; width: min(40rem, 100%); padding: clamp(2rem, 14vh, 8rem) clamp(1.5rem, 7vw, 7rem) 0;
+        /* Space of the two crests above the title in the React title screen. */
+        border-top: calc(34px * 52 / 48 + 0.7rem) solid transparent; }
+      .boot-title h1 { margin: 0; color: #f0d9a0; font: 600 clamp(2.6rem, 5.4vw, 4.3rem) / 1.05 "Cinzel", Georgia, serif; letter-spacing: 0.14em;
+        text-shadow: 0 0.2rem 1.6rem rgb(0 0 0 / 80%), 0 0 2.4rem rgb(210 174 99 / 22%); }
+      .boot-title p { margin: 0.55rem 0 0; color: #b3a990; font: italic 1.3rem "Cormorant Garamond", Georgia, serif; letter-spacing: 0.04em; }
+      @media (max-aspect-ratio: 4/5) { .boot-title .art { background-image: url("data:image/webp;base64,UklGRrIAAABXRUJQVlA4IKYAAADQBQCdASogADkAPtFYpk0oJSOiKBgNUQAaCWUAygBPY3A5ImhKrVHoVxmu1bMY0e89qTyVxiKAAP735h37Vd9LTSVvJI/SjWTBXwfrsGnCdoNj7QOIzJ9gD0z5e2iav+BmEDypqeypqI8adDapoVkNKNDJ/OeoFhmXse4yE26JxHQyipelUuEUULPPdrl1grGDVpMC2uEKxz2GqbV2MTHaYvtyYQAA"); background-position: center top; } }
+      @media (max-width: 700px) { .boot-title .logo { display: none; } }
     </style>
   </head>
   <body>
     <div id="root">
-      <div class="boot-splash" role="progressbar" aria-label="Loading Magic Chess"><h1>Magic Chess</h1><div class="bar"></div></div>
+      <div class="boot-title" aria-busy="true"><div class="art"></div><div class="shade"></div>
+        <div class="logo"><h1>Magic Chess</h1><p>Ivory against obsidian</p></div></div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
