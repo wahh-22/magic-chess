@@ -4,25 +4,21 @@ import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { fetchWithProgress } from "./fetchProgress";
 import { waitForGpu } from "./gpuFence";
 import { isSoftwareRenderer, provideMipChain, rendererName } from "./mipmaps";
-import { createProgressTracker, type LoadPhase, type LoadStage } from "./progress";
+import type { LoadPhase, LoadStage } from "./progress";
 import { resources } from "./resource";
-import { createStagedLoader } from "./stagedLoader";
+import { loadProgress, prefetched } from "./state";
 import { createTimeSlicedQueue } from "./timeSlicedQueue";
+
+export { loadProgress, sceneLoader } from "./state";
 
 /**
  * Central asset manager: every scene download, build step, GPU upload and program link goes
  * through here, so the loading screen shows real progress and heavy GPU work is time-sliced.
  */
-export const loadProgress = createProgressTracker();
-export const sceneLoader = createStagedLoader();
 /** Texture uploads and other GPU work, a few milliseconds per frame. */
 export const gpuQueue = createTimeSlicedQueue({ budgetMs: 6 });
 /** Main-thread side of worker mip chains (copying each image to the worker), spread over frames. */
 const mipQueue = createTimeSlicedQueue({ budgetMs: 6 });
-
-// Meshopt decoding runs in workers instead of on the main thread.
-// eslint-disable-next-line react-hooks/rules-of-hooks -- a meshopt API named like a hook, not a React hook.
-if (typeof Worker !== "undefined") MeshoptDecoder.useWorkers(2);
 
 /** Registers a step of work and settles its bar item with the promise. */
 export function track<T>(id: string, stage: LoadStage, phase: LoadPhase, work: () => Promise<T>): Promise<T> {
@@ -33,10 +29,13 @@ export function track<T>(id: string, stage: LoadStage, phase: LoadPhase, work: (
   );
 }
 
+/** Downloads with byte progress; bytes prefetched behind the title menu are used instead when present. */
 export function fetchAsset(url: string, stage: LoadStage): Promise<ArrayBuffer> {
   const id = `download:${url}`;
   loadProgress.add(id, { stage, phase: "download" });
-  return fetchWithProgress(url, { onProgress: (loaded, total) => loadProgress.update(id, loaded, total) }).then(
+  const onProgress = (loaded: number, total: number | undefined) => loadProgress.update(id, loaded, total);
+  const download = () => fetchWithProgress(url, { onProgress });
+  return (prefetched.take(url, onProgress)?.catch(download) ?? download()).then(
     (buffer) => { loadProgress.done(id); return buffer; },
     (error: unknown) => { loadProgress.fail(id); throw error; },
   );
@@ -88,7 +87,11 @@ let gltfLoader: GLTFLoader | undefined;
 export function loadGLB(url: string, stage: LoadStage = "critical"): Promise<GLTF> {
   return resources.preload(`gltf:${url}`, async () => {
     const buffer = await fetchAsset(url, stage);
-    gltfLoader ??= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+    if (!gltfLoader) {
+      // Meshopt decoding runs in workers, started with the first model (not while the menu is shown).
+      if (typeof Worker !== "undefined") MeshoptDecoder.useWorkers(2);
+      gltfLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+    }
     return gltfLoader.parseAsync(buffer, url.slice(0, url.lastIndexOf("/") + 1));
   });
 }
@@ -149,5 +152,3 @@ export function uploadTextures(renderer: WebGLRenderer, root: Object3D, stage: L
     });
   })).then(() => loadProgress.done(id));
 }
-
-if (import.meta.env.DEV) Object.assign(globalThis, { __sceneLoader: sceneLoader, __loadProgress: loadProgress });

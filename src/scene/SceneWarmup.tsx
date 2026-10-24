@@ -1,9 +1,22 @@
 import { useThree } from "@react-three/fiber";
 import { useEffect } from "react";
+import type { Object3D } from "three";
 import { gpuIdle, gpuQueue, sceneLoader, track } from "../loading/assets";
 import { prepareForDisplay } from "./StreamIn";
 
 const nextTask = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+/**
+ * Runs `render` with frustum culling off: every mesh is drawn once, not only what the play
+ * camera sees. The arrival shot and the free camera bring the rest into view, and a first
+ * draw uploads its buffers (and in software GL builds its pipeline) inside that frame.
+ */
+function drawingEverything(root: Object3D, render: () => void) {
+  const culled: Object3D[] = [];
+  root.traverse((object) => { if (object.frustumCulled) { object.frustumCulled = false; culled.push(object); } });
+  try { render(); }
+  finally { for (const object of culled) object.frustumCulled = true; }
+}
 
 /** Times a warm-up step in the browser's performance timeline (DevTools, scripts/perf). */
 async function measured<T>(name: string, step: () => Promise<T>): Promise<T> {
@@ -34,7 +47,7 @@ export function SceneWarmup({ postprocessing, pass }: { postprocessing: boolean;
       await track(`compile:first-frame-${pass}`, "critical", "compile", async () => {
         await nextTask();
         if (!active) return;
-        await measured("first-frame", async () => { get().advance(performance.now()); });
+        await measured("first-frame", async () => drawingEverything(scene, () => get().advance(performance.now())));
         await measured("first-frame-gpu", () => gpuIdle(gl));
       });
       await nextTask();

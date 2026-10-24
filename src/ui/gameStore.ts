@@ -39,6 +39,8 @@ export interface GameStore {
   importPgn(text: string): string | null;
   undo(): void;
   startGame(settings: GameSettings): void;
+  /** Starts Stockfish (worker + UCI handshake) before a game vs the engine; resolves false on failure. */
+  prepareEngine(): Promise<boolean>;
   selectSquare(square: Square): void;
   submitCommand(text: string): void;
   choosePromotion(piece: PromotionPiece): void;
@@ -225,6 +227,17 @@ export function createGameStore(deps: { createEngine: () => Engine; now?: () => 
           initializeEngine(id);
           void requestAiMove();
         }
+      },
+
+      prepareEngine() {
+        // Shared with the game: startGame reuses this engine; a failure is retried on the engine's turn.
+        try {
+          engine ??= deps.createEngine();
+          engineReady = engine.newGame().then(() => true, () => false);
+        } catch {
+          engineReady = Promise.resolve(false);
+        }
+        return engineReady;
       },
 
       selectSquare(square) {
